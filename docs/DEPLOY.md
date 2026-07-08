@@ -99,13 +99,13 @@ Depois do deploy na Vercel, configure em Authentication > URL Configuration:
 Site URL:
 
 ```text
-https://SEU-PROJETO.vercel.app
+https://nova-forma-crm.vercel.app
 ```
 
 Redirect URLs:
 
 ```text
-https://SEU-PROJETO.vercel.app/**
+https://nova-forma-crm.vercel.app/**
 http://localhost:3000/**
 ```
 
@@ -154,11 +154,18 @@ select public.seed_nova_forma_demo('UUID_DO_USUARIO');
 
 ### 1. Subir Para GitHub
 
-1. Crie um repositorio no GitHub.
-2. Suba o projeto.
-3. Confirme que `.env.local` nao foi enviado.
-4. Confirme que a branch principal e `main`.
-5. A cada push, o GitHub Actions executa typecheck, lint, testes unitarios e build pelo workflow `.github/workflows/ci.yml`.
+Repositorio atual:
+
+```text
+https://github.com/tiiagobento/tiiagobento.github.io
+```
+
+1. Suba o projeto para esse repositorio.
+2. Confirme que `.env.local` nao foi enviado.
+3. Confirme que a branch principal e `main`.
+4. A cada push, o GitHub Actions executa typecheck, lint, testes unitarios e build pelo workflow `.github/workflows/ci.yml`.
+
+Apesar do nome `tiiagobento.github.io`, nao ative o GitHub Pages para esta aplicacao. O CRM usa Next.js, rotas dinamicas, SSR e Supabase Auth; a hospedagem correta e a Vercel.
 
 ### 2. Importar Na Vercel
 
@@ -170,6 +177,14 @@ select public.seed_nova_forma_demo('UUID_DO_USUARIO');
 6. Install Command: `npm install`.
 7. Em Git, confirme que o repositorio esta conectado para deploy automatico da branch `main`.
 
+Projeto atual na Vercel:
+
+```text
+Equipe: steelframe
+Projeto: nova-forma-crm
+Producao: https://nova-forma-crm.vercel.app
+```
+
 ### 3. Variaveis Na Vercel
 
 Em Project Settings > Environment Variables, configure:
@@ -180,6 +195,8 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=SUA_ANON_PUBLIC_KEY
 ```
 
 Depois de criar ou alterar variaveis, rode Redeploy.
+
+Para este projeto, cadastre as duas variaveis em Production, Preview e Development. Nao cadastre `VERCEL_OIDC_TOKEN` manualmente e nao adicione `SUPABASE_SERVICE_ROLE_KEY`, pois o fluxo atual nao precisa dela.
 
 ### 4. Dominio Personalizado
 

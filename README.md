@@ -154,12 +154,18 @@ Para atribuir uma visita, edite um lead como admin e preencha parceiro, data/sta
 
 ## Deploy na Vercel
 
-1. Suba o projeto para um repositorio Git.
-2. Importe o repositorio na Vercel.
+Repositorio: `https://github.com/tiiagobento/tiiagobento.github.io`
+
+Aplicacao: `https://nova-forma-crm.vercel.app`
+
+1. Envie as alteracoes para a branch `main`.
+2. A Vercel publica automaticamente o projeto `steelframe/nova-forma-crm`.
 3. Configure `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 4. Nao configure `SUPABASE_SERVICE_ROLE_KEY` no frontend; use apenas se criar backend server-only no futuro.
 5. Rode o deploy.
 6. No Supabase, confirme que `supabase/schema.sql` foi aplicado antes de usar o CRM.
+
+Nao use GitHub Pages: este projeto depende dos recursos de runtime do Next.js e do Supabase Auth.
 
 Guia completo: `docs/DEPLOY.md`.
 
