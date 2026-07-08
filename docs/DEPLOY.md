@@ -157,6 +157,8 @@ select public.seed_nova_forma_demo('UUID_DO_USUARIO');
 1. Crie um repositorio no GitHub.
 2. Suba o projeto.
 3. Confirme que `.env.local` nao foi enviado.
+4. Confirme que a branch principal e `main`.
+5. A cada push, o GitHub Actions executa typecheck, lint, testes unitarios e build pelo workflow `.github/workflows/ci.yml`.
 
 ### 2. Importar Na Vercel
 
@@ -166,6 +168,7 @@ select public.seed_nova_forma_demo('UUID_DO_USUARIO');
 4. Framework Preset: Next.js.
 5. Build Command: `npm run build`.
 6. Install Command: `npm install`.
+7. Em Git, confirme que o repositorio esta conectado para deploy automatico da branch `main`.
 
 ### 3. Variaveis Na Vercel
 
