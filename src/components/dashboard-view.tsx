@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import {
   Bar,
@@ -29,6 +30,8 @@ import {
   Inbox,
   ListChecks,
   MessageSquareText,
+  Plus,
+  Sparkles,
   TrendingUp,
   Users,
   XCircle,
@@ -38,6 +41,7 @@ import { ptBR } from "date-fns/locale";
 import { EmptyState } from "@/components/empty-state";
 import { LeadPriorityBadge, LeadScoreBadge, LeadStatusBadge } from "@/components/lead-badges";
 import { MetricCard } from "@/components/metric-card";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { daysSinceLastContact, isStaleLead } from "@/lib/business";
@@ -48,6 +52,8 @@ import type { Interaction, Lead, Task } from "@/lib/types";
 const chartColors = ["#12323b", "#b7793c", "#257365", "#81909a", "#d7a45c", "#a45537", "#4e646f", "#6f5d4e"];
 
 export function DashboardView({ leads, interactions, tasks }: { leads: Lead[]; interactions: Interaction[]; tasks: Task[] }) {
+  const [showMoreMetrics, setShowMoreMetrics] = React.useState(false);
+
   if (!leads.length && !tasks.length) {
     return (
       <EmptyState
@@ -90,20 +96,70 @@ export function DashboardView({ leads, interactions, tasks }: { leads: Lead[]; i
 
   return (
     <div className="space-y-5">
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-6">
+      <section className="flex flex-col gap-2 rounded-xl border bg-card/90 p-3 shadow-sm sm:flex-row sm:flex-wrap sm:items-center">
+        <Button asChild>
+          <Link href="/leads/new">
+            <Plus className="size-4" />
+            Novo lead
+          </Link>
+        </Button>
+        <Button asChild variant="accent">
+          <Link href="/leads/ai-import">
+            <Sparkles className="size-4" />
+            Importar com IA
+          </Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/leads?score=hot">
+            <Flame className="size-4" />
+            Ver leads quentes
+          </Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/tasks?status=atrasada">
+            <AlertTriangle className="size-4" />
+            Tarefas atrasadas
+          </Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/pipeline">
+            <ListChecks className="size-4" />
+            Abrir pipeline
+          </Link>
+        </Button>
+      </section>
+
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
         <MetricCard title="Total de leads" value={leads.length} icon={Users} />
-        <MetricCard title="Novos leads" value={countStatus(leads, "Novo lead")} icon={Flame} tone="gold" />
-        <MetricCard title="Qualificados" value={countStatus(leads, "Qualificado")} icon={CheckCircle2} tone="green" />
+        <MetricCard title="Leads quentes" value={hotLeads.length} icon={Flame} tone="gold" />
         <MetricCard title="Visitas marcadas" value={countStatus(leads, "Visita marcada")} icon={CalendarCheck} tone="green" />
         <MetricCard title="Orcamentos enviados" value={countStatus(leads, "Orcamento enviado")} icon={FileText} tone="gold" />
-        <MetricCard title="Em negociacao" value={countStatus(leads, "Em negociacao")} icon={Handshake} />
         <MetricCard title="Obras fechadas" value={closed} icon={CircleDollarSign} tone="green" />
-        <MetricCard title="Leads perdidos" value={lost} icon={XCircle} tone="red" />
-        <MetricCard title="Leads quentes" value={hotLeads.length} icon={Flame} tone="gold" />
-        <MetricCard title="Leads atrasados" value={staleLeads.length} icon={AlertTriangle} tone={staleLeads.length ? "red" : "default"} />
-        <MetricCard title="Valor potencial total" value={formatCurrency(potential)} icon={CircleDollarSign} tone="gold" />
-        <MetricCard title="Taxa de conversao" value={`${conversion}%`} icon={TrendingUp} />
+        <MetricCard title="Tarefas atrasadas" value={overdueTasks.length} icon={AlertTriangle} tone={overdueTasks.length ? "red" : "default"} />
       </section>
+
+      <div className="rounded-xl border bg-card/80 p-3 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-primary">Mais indicadores</h2>
+            <p className="text-xs text-muted-foreground">Metricas secundarias ficam recolhidas para manter o dashboard mais rapido de ler.</p>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={() => setShowMoreMetrics((value) => !value)} aria-expanded={showMoreMetrics}>
+            {showMoreMetrics ? "Ocultar indicadores" : "Expandir metricas"}
+          </Button>
+        </div>
+        {showMoreMetrics ? (
+          <section className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+            <MetricCard title="Novos leads" value={countStatus(leads, "Novo lead")} icon={Flame} tone="gold" />
+            <MetricCard title="Qualificados" value={countStatus(leads, "Qualificado")} icon={CheckCircle2} tone="green" />
+            <MetricCard title="Em negociacao" value={countStatus(leads, "Em negociacao")} icon={Handshake} />
+            <MetricCard title="Leads perdidos" value={lost} icon={XCircle} tone="red" />
+            <MetricCard title="Leads atrasados" value={staleLeads.length} icon={AlertTriangle} tone={staleLeads.length ? "red" : "default"} />
+            <MetricCard title="Valor potencial total" value={formatCurrency(potential)} icon={CircleDollarSign} tone="gold" />
+            <MetricCard title="Taxa de conversao" value={`${conversion}%`} icon={TrendingUp} />
+          </section>
+        ) : null}
+      </div>
 
       <section className="grid gap-4 xl:grid-cols-3">
         <ChartCard title="Leads por origem" description="Canais que estao gerando oportunidades">

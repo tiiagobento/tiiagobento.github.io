@@ -15,6 +15,7 @@ export default defineConfig({
     include: ["src/**/*.test.{ts,tsx}"],
     exclude: ["node_modules", ".next", "e2e"],
     css: true,
+    pool: "threads",
     fileParallelism: false,
     maxWorkers: 1,
     testTimeout: 20_000,

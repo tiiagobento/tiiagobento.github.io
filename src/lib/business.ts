@@ -67,8 +67,10 @@ export function applyTemplate(template: string, lead: Partial<Lead>) {
     "{responsavel}": lead.assigned_to ?? "Tiago",
     "{data_visita}": visitDate ? format(visitDate, "dd/MM/yyyy", { locale: ptBR }) : "",
     "{horario_visita}": visitDate ? format(visitDate, "HH:mm", { locale: ptBR }) : "",
+    "{empresa}": "Nova Forma Steel Frame",
+    "{proximo_passo}": lead.next_action_at ? "agendar o proximo contato" : "",
   };
 
   return template
-    .replace(/\{nome\}|\{cidade\}|\{bairro\}|\{tipo_obra\}|\{responsavel\}|\{data_visita\}|\{horario_visita\}/g, (variable) => values[variable] ?? "");
+    .replace(/\{nome\}|\{cidade\}|\{bairro\}|\{tipo_obra\}|\{responsavel\}|\{data_visita\}|\{horario_visita\}|\{empresa\}|\{proximo_passo\}/g, (variable) => values[variable] ?? "");
 }

@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { format, isBefore, parseISO, startOfToday } from "date-fns";
+import { addDays, format, isBefore, parseISO, startOfToday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   ArrowLeft,
@@ -31,6 +31,7 @@ import { WhatsAppButton } from "@/components/whatsapp-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -39,6 +40,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useCrmData } from "@/hooks/use-crm-data";
 import { applyTemplate, buildWhatsAppUrl, daysSinceLastContact, isStaleLead, isValidWhatsAppPhone } from "@/lib/business";
 import { interactionTypes, leadStatuses, priorities, templateCategories, visitStatuses } from "@/lib/constants";
+import { getTemplatesWithDefaults, isDefaultMessageTemplate } from "@/lib/default-message-templates";
 import { interactionSchema } from "@/lib/schemas";
 import { cn, formatCurrency } from "@/lib/utils";
 import type { LeadFormValues } from "@/lib/schemas";
@@ -123,6 +125,28 @@ export default function LeadDetailPage() {
     await updateLead(currentLead.id, { priority });
   }
 
+  async function markQuoteSent() {
+    await updateLead(currentLead.id, { status: "Orcamento enviado" });
+    await addInteraction(currentLead.id, {
+      interaction_type: "Orcamento enviado",
+      responsible: currentLead.assigned_to ?? "Tiago",
+      description: "Orcamento enviado ao cliente.",
+      next_step: "Retomar orcamento enviado",
+      next_contact_at: addDays(new Date(), 3).toISOString(),
+    });
+  }
+
+  async function reactivateLead() {
+    await updateLead(currentLead.id, { status: "Em triagem", priority: currentLead.priority === "Baixa" ? "Media" : currentLead.priority });
+    await addInteraction(currentLead.id, {
+      interaction_type: "Follow-up",
+      responsible: currentLead.assigned_to ?? "Tiago",
+      description: "Lead reativado para nova tentativa comercial.",
+      next_step: "Retomar conversa pelo WhatsApp",
+      next_contact_at: addDays(new Date(), 1).toISOString(),
+    });
+  }
+
   async function createTask(input: NewTaskInput) {
     const dueDate = combineDateTime(input.date, input.time);
     await saveTask({
@@ -146,7 +170,7 @@ export default function LeadDetailPage() {
           <CardTitle className="text-base text-primary">Acoes rapidas</CardTitle>
           <CardDescription>Atualize o andamento sem sair da ficha.</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+        <CardContent className="grid gap-3 md:grid-cols-[1fr_1fr_auto_auto_auto_auto]">
           <Select value={lead.status} onValueChange={(status) => changeStatus(status as LeadStatus)}>
             <SelectTrigger>
               <SelectValue />
@@ -175,10 +199,21 @@ export default function LeadDetailPage() {
             <CalendarClock className="size-4" />
             Registrar contato agora
           </Button>
+          <ScheduleVisitDialog lead={lead} onUpdateLead={updateLead} onSaveTask={saveTask} />
+          <Button variant="outline" onClick={markQuoteSent}>
+            <FileText className="size-4" />
+            Orcamento enviado
+          </Button>
+          {lead.status === "Perdido" || lead.status === "Sem resposta" ? (
+            <Button variant="accent" onClick={reactivateLead}>
+              <MessageCircle className="size-4" />
+              Reativar lead
+            </Button>
+          ) : null}
         </CardContent>
       </Card>
 
-      <LeadTemplatePanel lead={lead} templates={templates} />
+      <LeadTemplatePanel lead={lead} templates={templates} onAddInteraction={(input) => addInteraction(lead.id, input)} />
 
       {currentProfile?.role !== "partner" ? (
         <PartnerAssignmentPanel lead={lead} partners={profiles.filter((profile) => profile.role === "partner")} onUpdate={(input) => updateLead(lead.id, input)} />
@@ -238,6 +273,80 @@ export default function LeadDetailPage() {
         <LeadTasksPanel tasks={{ pending: pendingTasks, overdue: overdueTasks, completed: completedTasks }} onComplete={completeTask} />
       </section>
     </div>
+  );
+}
+
+function ScheduleVisitDialog({
+  lead,
+  onUpdateLead,
+  onSaveTask,
+}: {
+  lead: Lead;
+  onUpdateLead: (id: string, input: Partial<Lead>) => Promise<Lead>;
+  onSaveTask: (input: Partial<Task> & Pick<Task, "title" | "due_date" | "priority" | "status">) => Promise<void>;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const [date, setDate] = React.useState(toDatetimeLocal(lead.visit_scheduled_at || lead.next_action_at) || defaultVisitDate());
+  const [saving, setSaving] = React.useState(false);
+
+  React.useEffect(() => {
+    if (open) setDate(toDatetimeLocal(lead.visit_scheduled_at || lead.next_action_at) || defaultVisitDate());
+  }, [lead.next_action_at, lead.visit_scheduled_at, open]);
+
+  async function scheduleVisit() {
+    if (!date) {
+      toast.error("Informe data e horario da visita.");
+      return;
+    }
+    const visitDate = new Date(date).toISOString();
+    setSaving(true);
+    try {
+      await onUpdateLead(lead.id, {
+        status: "Visita marcada",
+        visit_scheduled_at: visitDate,
+        visit_status: "Visita marcada",
+        wants_visit: true,
+        next_action_at: visitDate,
+      });
+      await onSaveTask({
+        lead_id: lead.id,
+        title: `Visita tecnica - ${lead.name}`,
+        description: "Visita criada pela acao rapida da ficha do lead.",
+        due_date: visitDate,
+        priority: lead.priority,
+        status: "pendente",
+        responsible: lead.assigned_to ?? "Tiago",
+      });
+      toast.success("Visita marcada e tarefa criada.");
+      setOpen(false);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline">
+          <CalendarClock className="size-4" />
+          Marcar visita
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Marcar visita</DialogTitle>
+          <DialogDescription>Atualiza o status do lead, registra a data da visita e cria uma tarefa vinculada.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <Field label="Data e horario">
+            <Input type="datetime-local" value={date} onChange={(event) => setDate(event.target.value)} />
+          </Field>
+          <Button onClick={scheduleVisit} disabled={saving} className="w-full">
+            {saving ? "Marcando..." : "Confirmar visita"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -505,32 +614,68 @@ function PartnerAssignmentPanel({
   );
 }
 
-function LeadTemplatePanel({ lead, templates }: { lead: Lead; templates: MessageTemplate[] }) {
+function LeadTemplatePanel({
+  lead,
+  templates,
+  onAddInteraction,
+}: {
+  lead: Lead;
+  templates: MessageTemplate[];
+  onAddInteraction: (input: Omit<Interaction, "id" | "lead_id" | "created_at">) => Promise<void>;
+}) {
   const [category, setCategory] = React.useState("Todas");
-  const filteredTemplates = templates.filter((template) => category === "Todas" || template.category === category);
+  const availableTemplates = React.useMemo(() => getTemplatesWithDefaults(templates), [templates]);
+  const filteredTemplates = availableTemplates.filter((template) => category === "Todas" || template.category === category);
   const [templateId, setTemplateId] = React.useState(filteredTemplates[0]?.id ?? "none");
+  const [message, setMessage] = React.useState("");
+  const [registerInteraction, setRegisterInteraction] = React.useState(true);
+  const [nextStep, setNextStep] = React.useState("Fazer follow-up da mensagem enviada");
+  const [nextContact, setNextContact] = React.useState("");
+  const [savingInteraction, setSavingInteraction] = React.useState(false);
 
   React.useEffect(() => {
-    const available = templates.filter((template) => category === "Todas" || template.category === category);
+    const available = availableTemplates.filter((template) => category === "Todas" || template.category === category);
     if (!available.some((template) => template.id === templateId)) {
       setTemplateId(available[0]?.id ?? "none");
     }
-  }, [category, templateId, templates]);
+  }, [availableTemplates, category, templateId]);
 
-  const selectedTemplate = templates.find((template) => template.id === templateId);
+  const selectedTemplate = availableTemplates.find((template) => template.id === templateId);
   const renderedMessage = selectedTemplate ? applyTemplate(selectedTemplate.content, lead) : "";
-  const whatsappUrl = buildWhatsAppUrl(lead.phone, renderedMessage);
+  const whatsappUrl = buildWhatsAppUrl(lead.phone, message);
+  const missingFields = selectedTemplate ? getMissingTemplateFields(selectedTemplate.content, lead) : [];
+
+  React.useEffect(() => {
+    setMessage(renderedMessage);
+  }, [renderedMessage]);
+
+  async function registerMessageInteraction(action: "copiada" | "aberta no WhatsApp") {
+    if (!registerInteraction || !message.trim()) return;
+    setSavingInteraction(true);
+    try {
+      await onAddInteraction({
+        interaction_type: "WhatsApp",
+        responsible: lead.assigned_to ?? "Tiago",
+        description: `Mensagem ${action}: ${message}`,
+        next_step: nextStep.trim() || null,
+        next_contact_at: nextContact ? new Date(nextContact).toISOString() : null,
+      });
+    } finally {
+      setSavingInteraction(false);
+    }
+  }
 
   async function copyMessage() {
-    if (!renderedMessage) {
+    if (!message.trim()) {
       toast.error("Escolha um template antes de copiar.");
       return;
     }
-    await navigator.clipboard.writeText(renderedMessage);
+    await navigator.clipboard.writeText(message);
+    await registerMessageInteraction("copiada");
     toast.success("Mensagem copiada.");
   }
 
-  function openWhatsApp() {
+  async function openWhatsApp() {
     if (!selectedTemplate) {
       toast.error("Escolha um template antes de abrir o WhatsApp.");
       return;
@@ -540,6 +685,7 @@ function LeadTemplatePanel({ lead, templates }: { lead: Lead; templates: Message
       return;
     }
     window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+    await registerMessageInteraction("aberta no WhatsApp");
   }
 
   return (
@@ -577,29 +723,63 @@ function LeadTemplatePanel({ lead, templates }: { lead: Lead; templates: Message
                 <SelectItem value="none">Escolha um template</SelectItem>
                 {filteredTemplates.map((template) => (
                   <SelectItem key={template.id} value={template.id}>
-                    {template.title}
+                    {template.title} {isDefaultMessageTemplate(template) ? "(padrao)" : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </Field>
+          {missingFields.length ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
+              Revise antes de enviar: faltam {missingFields.join(", ")} para preencher melhor esta mensagem.
+            </div>
+          ) : null}
+          {!isValidWhatsAppPhone(lead.phone) ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs leading-5 text-red-800">Telefone incompleto ou invalido para WhatsApp.</div>
+          ) : null}
+          <label className="flex items-start gap-2 rounded-xl border bg-secondary/35 p-3 text-sm">
+            <input type="checkbox" checked={registerInteraction} onChange={(event) => setRegisterInteraction(event.target.checked)} className="mt-1" />
+            <span>Registrar interacao automaticamente ao copiar ou abrir WhatsApp.</span>
+          </label>
+          <div className="grid gap-2">
+            <Input value={nextStep} onChange={(event) => setNextStep(event.target.value)} placeholder="Proximo passo opcional" />
+            <Input type="datetime-local" value={nextContact} onChange={(event) => setNextContact(event.target.value)} aria-label="Data do follow-up" />
+            <p className="text-xs text-muted-foreground">Se informar data, uma tarefa de follow-up sera criada automaticamente.</p>
+          </div>
           <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
-            <Button type="button" variant="outline" onClick={copyMessage}>
+            <Button type="button" variant="outline" onClick={copyMessage} disabled={savingInteraction}>
               <Copy className="size-4" />
-              Copiar mensagem
+              {savingInteraction ? "Registrando..." : "Copiar mensagem"}
             </Button>
-            <Button type="button" variant="accent" onClick={openWhatsApp}>
+            <Button type="button" variant="accent" onClick={openWhatsApp} disabled={savingInteraction}>
               <MessageCircle className="size-4" />
               Abrir WhatsApp
             </Button>
           </div>
         </div>
-        <div className="min-h-44 whitespace-pre-line rounded-md border bg-secondary/30 p-4 text-sm leading-6">
-          {selectedTemplate ? renderedMessage : "Nenhum template selecionado para preview."}
-        </div>
+        <Field label="Preview editavel">
+          <Textarea
+            value={message}
+            onChange={(event) => setMessage(event.target.value)}
+            className="min-h-64 whitespace-pre-line text-sm leading-6"
+            placeholder="Escolha um template para gerar a mensagem."
+          />
+        </Field>
       </CardContent>
     </Card>
   );
+}
+
+function getMissingTemplateFields(template: string, lead: Lead) {
+  const checks: Array<[string, boolean]> = [
+    ["nome", template.includes("{nome}") && !lead.name],
+    ["cidade", template.includes("{cidade}") && !lead.city],
+    ["bairro", template.includes("{bairro}") && !lead.neighborhood],
+    ["tipo de obra", template.includes("{tipo_obra}") && !lead.project_type],
+    ["data da visita", template.includes("{data_visita}") && !lead.visit_scheduled_at && !lead.next_action_at],
+    ["horario da visita", template.includes("{horario_visita}") && !lead.visit_scheduled_at && !lead.next_action_at],
+  ];
+  return checks.filter(([, missing]) => missing).map(([label]) => label);
 }
 
 function InteractionForm({
@@ -809,7 +989,7 @@ function LeadTasksPanel({
       <CardContent className="space-y-4">
         <TaskGroup title="Pendentes" tasks={tasks.pending} empty="Nenhuma tarefa pendente." onComplete={onComplete} />
         <TaskGroup title="Atrasadas" tasks={tasks.overdue} empty="Nenhuma tarefa atrasada." tone="danger" onComplete={onComplete} />
-        <TaskGroup title="Concluidas" tasks={tasks.completed} empty="Nenhuma tarefa concluida." tone="success" onComplete={onComplete} />
+        <TaskGroup title="Concluidas" tasks={tasks.completed} empty="Nenhuma tarefa concluida." tone="success" onComplete={onComplete} collapsedDefault />
       </CardContent>
     </Card>
   );
@@ -821,20 +1001,26 @@ function TaskGroup({
   empty,
   tone,
   onComplete,
+  collapsedDefault,
 }: {
   title: string;
   tasks: Task[];
   empty: string;
   tone?: "danger" | "success";
   onComplete: (id: string) => Promise<void>;
+  collapsedDefault?: boolean;
 }) {
+  const [collapsed, setCollapsed] = React.useState(Boolean(collapsedDefault));
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
         <h3 className="text-sm font-semibold">{title}</h3>
-        <Badge variant={tone === "danger" ? "danger" : tone === "success" ? "success" : "secondary"}>{tasks.length}</Badge>
+        <button type="button" onClick={() => setCollapsed((value) => !value)} className="flex items-center gap-2">
+          <Badge variant={tone === "danger" ? "danger" : tone === "success" ? "success" : "secondary"}>{tasks.length}</Badge>
+          {collapsedDefault ? <span className="text-xs text-muted-foreground">{collapsed ? "Expandir" : "Recolher"}</span> : null}
+        </button>
       </div>
-      {tasks.length ? (
+      {collapsed ? null : tasks.length ? (
         <div className="space-y-2">
           {tasks.map((task) => (
             <TaskRow key={task.id} task={task} onComplete={onComplete} />
@@ -914,6 +1100,13 @@ function combineDateTime(date: string, time: string) {
 function toDatetimeLocal(value?: string | null) {
   if (!value) return "";
   const date = new Date(value);
+  const offset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+
+function defaultVisitDate() {
+  const date = addDays(new Date(), 1);
+  date.setHours(10, 0, 0, 0);
   const offset = date.getTimezoneOffset() * 60000;
   return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 }

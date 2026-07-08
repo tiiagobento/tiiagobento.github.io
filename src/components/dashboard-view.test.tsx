@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { DashboardView } from "@/components/dashboard-view";
 import { interactionFixture, leadFixture, taskFixture } from "@/test/fixtures";
@@ -19,6 +19,12 @@ describe("DashboardView", () => {
 
     expect(screen.getByText("Total de leads")).toBeInTheDocument();
     expect(screen.getAllByText("3")[0]).toBeInTheDocument();
+    expect(screen.getByText("Leads quentes")).toBeInTheDocument();
+    expect(screen.getAllByText("Tarefas atrasadas").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Valor potencial total")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /expandir metricas/i }));
+
     expect(screen.getByText("Valor potencial total")).toBeInTheDocument();
     expect(screen.getByText("R$ 800.000")).toBeInTheDocument();
     expect(screen.getByText("Taxa de conversao")).toBeInTheDocument();

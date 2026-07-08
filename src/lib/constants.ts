@@ -67,16 +67,25 @@ export const interactionTypes = [
 
 export const templateCategories = [
   "Primeiro contato",
-  "Pedido de informações",
+  "Pedido de informacoes",
   "Cliente com planta",
   "Cliente sem planta",
-  "Preço por m²",
+  "Preco por m2",
   "Agendamento de visita",
-  "Confirmação de visita",
-  "Pós-visita",
-  "Follow-up de orçamento",
+  "Confirmacao de visita",
+  "Pos-visita",
+  "Follow-up de orcamento",
   "Cliente sem resposta",
-  "Reativação",
+  "Reativacao",
+  "Cliente interessado em visita",
+  "Cliente de Google Meu Negocio",
+  "Cliente vindo do site",
+  "Cliente frio",
+  "Cliente quente",
+  "Obra longe",
+  "Solicitacao de fotos/planta",
+  "Encaminhamento para parceiro/Bruno",
+  "Fechamento/negociacao",
 ] as const;
 
 export const templateVariables = [
@@ -87,6 +96,8 @@ export const templateVariables = [
   "{responsavel}",
   "{data_visita}",
   "{horario_visita}",
+  "{empresa}",
+  "{proximo_passo}",
 ] as const;
 
 export const profileRoles = ["admin", "partner", "user"] as const;

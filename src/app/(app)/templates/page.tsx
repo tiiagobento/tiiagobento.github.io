@@ -26,6 +26,7 @@ import { LoadingSkeleton } from "@/components/loading-skeleton";
 import { useCrmData } from "@/hooks/use-crm-data";
 import { applyTemplate, buildWhatsAppUrl, isValidWhatsAppPhone } from "@/lib/business";
 import { templateCategories, templateVariables } from "@/lib/constants";
+import { getTemplatesWithDefaults, isDefaultMessageTemplate } from "@/lib/default-message-templates";
 import { cn } from "@/lib/utils";
 import type { Lead, MessageTemplate } from "@/lib/types";
 
@@ -58,7 +59,8 @@ export default function TemplatesPage() {
   if (loading) return <LoadingSkeleton />;
 
   const previewLead = leads.find((lead) => lead.id === previewLeadId);
-  const filteredTemplates = templates.filter((template) => {
+  const availableTemplates = getTemplatesWithDefaults(templates);
+  const filteredTemplates = availableTemplates.filter((template) => {
     const matchesCategory = categoryFilter === "Todas" || template.category === categoryFilter;
     const term = query.trim().toLowerCase();
     const matchesQuery = !term || `${template.title} ${template.category} ${template.content}`.toLowerCase().includes(term);
@@ -165,7 +167,14 @@ export default function TemplatesPage() {
           {filteredTemplates.length ? (
             <div className="grid gap-4 lg:grid-cols-2">
               {filteredTemplates.map((template) => (
-                <TemplateCard key={template.id} template={template} lead={previewLead} onEdit={editTemplate} onDelete={deleteTemplate} />
+                <TemplateCard
+                  key={template.id}
+                  template={template}
+                  lead={previewLead}
+                  onEdit={editTemplate}
+                  onDelete={deleteTemplate}
+                  onCopyDefault={(item) => saveTemplate({ title: item.title, category: item.category, content: item.content })}
+                />
               ))}
             </div>
           ) : (
@@ -252,14 +261,18 @@ function TemplateCard({
   lead,
   onEdit,
   onDelete,
+  onCopyDefault,
 }: {
   template: MessageTemplate;
   lead?: Lead;
   onEdit: (template: MessageTemplate) => void;
   onDelete: (id: string) => Promise<void>;
+  onCopyDefault: (template: MessageTemplate) => Promise<void>;
 }) {
   const renderedMessage = lead ? applyTemplate(template.content, lead) : template.content;
   const whatsappUrl = lead ? buildWhatsAppUrl(lead.phone, renderedMessage) : "";
+  const isDefault = isDefaultMessageTemplate(template);
+  const [copyingDefault, setCopyingDefault] = React.useState(false);
 
   async function copyMessage() {
     await navigator.clipboard.writeText(renderedMessage);
@@ -284,15 +297,20 @@ function TemplateCard({
         <div className="flex items-start justify-between gap-3">
           <div>
             <CardTitle className="text-base transition group-hover:text-primary">{template.title}</CardTitle>
-            <Badge variant="secondary" className="mt-2">
-              {template.category}
-            </Badge>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Badge variant="secondary">{template.category}</Badge>
+              <Badge variant={isDefault ? "outline" : "success"}>{isDefault ? "Padrao" : "Meu template"}</Badge>
+            </div>
           </div>
           <div className="flex gap-1">
-            <Button size="icon" variant="outline" onClick={() => onEdit(template)} aria-label="Editar template">
-              <Edit className="size-4" />
-            </Button>
-            <DeleteTemplateDialog template={template} onDelete={onDelete} />
+            {isDefault ? null : (
+              <>
+                <Button size="icon" variant="outline" onClick={() => onEdit(template)} aria-label="Editar template">
+                  <Edit className="size-4" />
+                </Button>
+                <DeleteTemplateDialog template={template} onDelete={onDelete} />
+              </>
+            )}
           </div>
         </div>
       </CardHeader>
@@ -307,6 +325,24 @@ function TemplateCard({
             <MessageCircle className="size-4" />
             Abrir WhatsApp
           </Button>
+          {isDefault ? (
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={copyingDefault}
+              onClick={async () => {
+                setCopyingDefault(true);
+                try {
+                  await onCopyDefault(template);
+                  toast.success("Template padrao salvo nos seus templates.");
+                } finally {
+                  setCopyingDefault(false);
+                }
+              }}
+            >
+              {copyingDefault ? "Salvando..." : "Salvar nos meus templates"}
+            </Button>
+          ) : null}
         </div>
       </CardContent>
     </Card>
