@@ -23,20 +23,25 @@ export default function LoginPage() {
 
   React.useEffect(() => {
     let active = true;
+    const sessionCheckFallback = window.setTimeout(() => {
+      if (active) setCheckingSession(false);
+    }, 3_000);
 
     async function checkSession() {
       if (!isSupabaseConfigured || !supabase) {
+        window.clearTimeout(sessionCheckFallback);
         if (active) setCheckingSession(false);
         return;
       }
 
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
 
       if (!active) return;
+      window.clearTimeout(sessionCheckFallback);
 
-      if (user) {
+      if (session) {
         router.replace("/dashboard");
         router.refresh();
         return;
@@ -49,6 +54,7 @@ export default function LoginPage() {
 
     return () => {
       active = false;
+      window.clearTimeout(sessionCheckFallback);
     };
   }, [router]);
 

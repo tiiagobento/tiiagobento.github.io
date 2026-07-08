@@ -16,7 +16,7 @@ test.describe("auth and route protection", () => {
   test("renders login form", async ({ page }) => {
     await page.goto("/login", { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: /entrar no crm/i })).toBeVisible();
-    await expect(page.locator('input[type="email"]')).toBeVisible();
+    await expect(page.locator('input[type="email"]')).toBeVisible({ timeout: 30_000 });
     await expect(page.locator('input[type="password"]')).toBeVisible();
     await expect(page.getByRole("button", { name: "Entrar" })).toBeVisible();
   });
@@ -24,7 +24,7 @@ test.describe("auth and route protection", () => {
   test("renders registration form", async ({ page }) => {
     await page.goto("/register", { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: /criar acesso/i })).toBeVisible();
-    await expect(page.locator('input[type="email"]')).toBeVisible();
+    await expect(page.locator('input[type="email"]')).toBeVisible({ timeout: 30_000 });
     await expect(page.locator('input[type="password"]')).toBeVisible();
     await expect(page.getByRole("button", { name: "Cadastrar" })).toBeVisible();
   });

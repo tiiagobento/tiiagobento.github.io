@@ -10,6 +10,7 @@ const routerMocks = vi.hoisted(() => ({
 }));
 
 const supabaseMocks = vi.hoisted(() => ({
+  getSession: vi.fn(),
   getUser: vi.fn(),
   signInWithPassword: vi.fn(),
   signUp: vi.fn(),
@@ -40,7 +41,7 @@ describe("auth flow", () => {
   });
 
   it("logs in with Supabase Auth and redirects to dashboard", async () => {
-    supabaseMocks.getUser.mockResolvedValue({ data: { user: null }, error: null });
+    supabaseMocks.getSession.mockResolvedValue({ data: { session: null }, error: null });
     supabaseMocks.signInWithPassword.mockResolvedValue({ error: null });
     const { container } = render(<LoginPage />);
 
@@ -55,7 +56,7 @@ describe("auth flow", () => {
   });
 
   it("registers a user through Supabase Auth", async () => {
-    supabaseMocks.getUser.mockResolvedValue({ data: { user: null }, error: null });
+    supabaseMocks.getSession.mockResolvedValue({ data: { session: null }, error: null });
     supabaseMocks.signUp.mockResolvedValue({ data: { session: { access_token: "token" } }, error: null });
     const { container } = render(<RegisterPage />);
 
@@ -78,6 +79,7 @@ describe("auth flow", () => {
   });
 
   it("logs out and clears CRM session state", async () => {
+    supabaseMocks.getSession.mockResolvedValue({ data: { session: null }, error: null });
     supabaseMocks.getUser.mockResolvedValue({ data: { user: null }, error: null });
     supabaseMocks.signOut.mockResolvedValue({ error: null });
 
