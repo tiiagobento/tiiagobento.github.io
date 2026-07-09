@@ -33,6 +33,26 @@ export async function waitForPuter(timeoutMs = PUTER_LOAD_TIMEOUT_MS) {
   throw new Error("Nao consegui carregar a IA. Verifique sua conexao e tente novamente.");
 }
 
+export async function ensurePuterAuthorizedFromUserAction() {
+  if (typeof window === "undefined") {
+    throw new Error("A IA precisa ser carregada no navegador.");
+  }
+
+  if (!isPuterReady() || !window.puter) {
+    throw new Error("A IA ainda esta carregando. Aguarde alguns segundos e tente novamente.");
+  }
+
+  const auth = window.puter.auth;
+  if (!auth?.signIn || !auth.isSignedIn) return;
+  if (auth.isSignedIn()) return;
+
+  try {
+    await auth.signIn({ attempt_temp_user_creation: true });
+  } catch (error) {
+    throw normalizePuterError(error, "O Puter pediu login/autorizacao. Conclua o acesso e tente novamente.");
+  }
+}
+
 export async function analyzeLeadTextWithPuter({ prompt, model = DEFAULT_MODEL }: { prompt: string; model?: string }) {
   const puter = await waitForPuter();
   try {

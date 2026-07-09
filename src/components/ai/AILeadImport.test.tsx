@@ -12,6 +12,7 @@ const crmMocks = vi.hoisted(() => ({
 
 const aiMocks = vi.hoisted(() => ({
   analyzeLeadWithPuter: vi.fn(),
+  ensurePuterAuthorizedFromUserAction: vi.fn(),
   isPuterReady: vi.fn(() => true),
   fileToDataUrl: vi.fn(),
 }));
@@ -40,6 +41,7 @@ vi.mock("@/hooks/use-crm-data", () => ({
 
 vi.mock("@/lib/ai/puter-client", () => ({
   analyzeLeadWithPuter: aiMocks.analyzeLeadWithPuter,
+  ensurePuterAuthorizedFromUserAction: aiMocks.ensurePuterAuthorizedFromUserAction,
   fileToDataUrl: aiMocks.fileToDataUrl,
   isPuterReady: aiMocks.isPuterReady,
 }));

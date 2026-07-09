@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useCrmData } from "@/hooks/use-crm-data";
 import { isValidWhatsAppPhone, sanitizePhone } from "@/lib/business";
-import { analyzeLeadWithPuter, fileToDataUrl, isPuterReady } from "@/lib/ai/puter-client";
+import { analyzeLeadWithPuter, ensurePuterAuthorizedFromUserAction, fileToDataUrl, isPuterReady } from "@/lib/ai/puter-client";
 import { leadSources, leadStatuses, priorities, projectTypes } from "@/lib/constants";
 import type { LeadFormValues } from "@/lib/schemas";
 import type { AIExtractedLead, AILeadAnalysisResult } from "@/lib/validations/ai-lead-draft";
@@ -96,6 +96,7 @@ export function AILeadImport() {
 
     setIsAnalyzing(true);
     try {
+      await ensurePuterAuthorizedFromUserAction();
       const result = await analyzeLeadWithPuter({
         conversation: trimmedConversation,
         source,
