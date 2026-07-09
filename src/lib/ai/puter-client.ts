@@ -4,6 +4,7 @@ import type { AIExtractedLead, AILeadAnalysisResult } from "@/lib/validations/ai
 
 const DEFAULT_MODEL = "gpt-5.4-nano";
 const PUTER_LOAD_TIMEOUT_MS = 10_000;
+const PUTER_CHAT_TIMEOUT_MS = 75_000;
 
 export type AnalyzeLeadWithPuterInput = {
   conversation: string;
@@ -35,7 +36,7 @@ export async function waitForPuter(timeoutMs = PUTER_LOAD_TIMEOUT_MS) {
 export async function analyzeLeadTextWithPuter({ prompt, model = DEFAULT_MODEL }: { prompt: string; model?: string }) {
   const puter = await waitForPuter();
   try {
-    return await puter?.ai.chat(prompt, { model });
+    return await withPuterChatTimeout(puter?.ai.chat(prompt, { model }));
   } catch (error) {
     throw normalizePuterError(error, "Nao foi possivel analisar esse texto.");
   }
@@ -44,9 +45,30 @@ export async function analyzeLeadTextWithPuter({ prompt, model = DEFAULT_MODEL }
 export async function analyzeLeadImageWithPuter({ image, prompt, model = DEFAULT_MODEL }: { image: string; prompt: string; model?: string }) {
   const puter = await waitForPuter();
   try {
-    return await puter?.ai.chat(prompt, image, { model });
+    return await withPuterChatTimeout(puter?.ai.chat(prompt, image, { model }));
   } catch (error) {
     throw normalizePuterError(error, "Nao foi possivel analisar essa imagem.");
+  }
+}
+
+async function withPuterChatTimeout<T>(promise: Promise<T> | undefined) {
+  if (!promise) {
+    throw new Error("Nao consegui iniciar a chamada da IA. Recarregue a pagina e tente novamente.");
+  }
+
+  let timeoutId: number | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timeoutId = window.setTimeout(
+          () => reject(new Error("A IA demorou demais para responder. Verifique se o Puter esta autorizado e tente novamente.")),
+          PUTER_CHAT_TIMEOUT_MS,
+        );
+      }),
+    ]);
+  } finally {
+    if (timeoutId) window.clearTimeout(timeoutId);
   }
 }
 
