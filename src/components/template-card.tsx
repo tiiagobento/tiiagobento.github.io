@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { WhatsAppButton } from "@/components/whatsapp-button";
 import { applyTemplate } from "@/lib/business";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import { formatTemplateCategory } from "@/lib/constants";
 import type { Lead, MessageTemplate } from "@/lib/types";
 
@@ -40,8 +41,12 @@ export function TemplateCard({
           <Button
             variant="outline"
             onClick={async () => {
-              await navigator.clipboard.writeText(renderedMessage);
-              toast.success("Mensagem copiada.");
+              try {
+                await copyTextToClipboard(renderedMessage);
+                toast.success("Mensagem copiada.");
+              } catch (error) {
+                toast.error(error instanceof Error ? error.message : "Nao foi possivel copiar a mensagem.");
+              }
             }}
           >
             <Copy className="size-4" />

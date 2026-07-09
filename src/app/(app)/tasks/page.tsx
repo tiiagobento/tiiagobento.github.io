@@ -55,6 +55,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { useCrmData } from "@/hooks/use-crm-data";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import { priorities } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import type { Lead, LeadStatus, Priority, Task } from "@/lib/types";
@@ -672,8 +673,12 @@ function AutomationLeadCard({
   const alreadyCreated = tasks.some((task) => task.lead_id === lead.id && task.title.startsWith("Roteiro site"));
 
   async function copyScript() {
-    await navigator.clipboard.writeText(plan.script);
-    toast.success("Roteiro copiado.");
+    try {
+      await copyTextToClipboard(plan.script);
+      toast.success("Roteiro copiado.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel copiar o roteiro.");
+    }
   }
 
   return (

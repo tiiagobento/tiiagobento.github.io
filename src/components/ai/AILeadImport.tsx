@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useCrmData } from "@/hooks/use-crm-data";
 import { isValidWhatsAppPhone, sanitizePhone } from "@/lib/business";
 import { analyzeLeadWithPuter, ensurePuterAuthorizedFromUserAction, fileToDataUrl, isPuterReady } from "@/lib/ai/puter-client";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import { leadSources, leadStatuses, priorities, projectTypes } from "@/lib/constants";
 import type { LeadFormValues } from "@/lib/schemas";
 import type { AIExtractedLead, AILeadAnalysisResult } from "@/lib/validations/ai-lead-draft";
@@ -200,8 +201,12 @@ export function AILeadImport() {
       toast.info("Nao ha resumo para copiar.");
       return;
     }
-    await navigator.clipboard.writeText(text);
-    toast.success("Resumo copiado.");
+    try {
+      await copyTextToClipboard(text);
+      toast.success("Resumo copiado.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel copiar o resumo.");
+    }
   }
 
   return (

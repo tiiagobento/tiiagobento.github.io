@@ -25,6 +25,7 @@ import { EmptyState } from "@/components/empty-state";
 import { LoadingSkeleton } from "@/components/loading-skeleton";
 import { useCrmData } from "@/hooks/use-crm-data";
 import { applyTemplate, buildWhatsAppUrl, isValidWhatsAppPhone } from "@/lib/business";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import { formatTemplateCategory, templateCategories, templateVariables } from "@/lib/constants";
 import { getTemplatesWithDefaults, isDefaultMessageTemplate } from "@/lib/default-message-templates";
 import { cn } from "@/lib/utils";
@@ -275,8 +276,12 @@ function TemplateCard({
   const [copyingDefault, setCopyingDefault] = React.useState(false);
 
   async function copyMessage() {
-    await navigator.clipboard.writeText(renderedMessage);
-    toast.success("Mensagem copiada.");
+    try {
+      await copyTextToClipboard(renderedMessage);
+      toast.success("Mensagem copiada.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel copiar a mensagem.");
+    }
   }
 
   function openWhatsApp() {

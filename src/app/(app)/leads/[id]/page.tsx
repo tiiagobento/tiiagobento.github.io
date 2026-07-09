@@ -39,6 +39,7 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { useCrmData } from "@/hooks/use-crm-data";
 import { applyTemplate, buildWhatsAppUrl, daysSinceLastContact, isStaleLead, isValidWhatsAppPhone } from "@/lib/business";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import { formatTemplateCategory, interactionTypes, leadStatuses, priorities, templateCategories, visitStatuses } from "@/lib/constants";
 import { getTemplatesWithDefaults, isDefaultMessageTemplate } from "@/lib/default-message-templates";
 import { interactionSchema } from "@/lib/schemas";
@@ -670,9 +671,13 @@ function LeadTemplatePanel({
       toast.error("Escolha um template antes de copiar.");
       return;
     }
-    await navigator.clipboard.writeText(message);
-    await registerMessageInteraction("copiada");
-    toast.success("Mensagem copiada.");
+    try {
+      await copyTextToClipboard(message);
+      await registerMessageInteraction("copiada");
+      toast.success("Mensagem copiada.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel copiar a mensagem.");
+    }
   }
 
   async function openWhatsApp() {
