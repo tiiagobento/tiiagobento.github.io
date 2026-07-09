@@ -25,7 +25,7 @@ import { EmptyState } from "@/components/empty-state";
 import { LoadingSkeleton } from "@/components/loading-skeleton";
 import { useCrmData } from "@/hooks/use-crm-data";
 import { applyTemplate, buildWhatsAppUrl, isValidWhatsAppPhone } from "@/lib/business";
-import { templateCategories, templateVariables } from "@/lib/constants";
+import { formatTemplateCategory, templateCategories, templateVariables } from "@/lib/constants";
 import { getTemplatesWithDefaults, isDefaultMessageTemplate } from "@/lib/default-message-templates";
 import { cn } from "@/lib/utils";
 import type { Lead, MessageTemplate } from "@/lib/types";
@@ -143,7 +143,7 @@ export default function TemplatesPage() {
                   <SelectItem value="Todas">Todas as categorias</SelectItem>
                   {templateCategories.map((category) => (
                     <SelectItem key={category} value={category}>
-                      {category}
+                      {formatTemplateCategory(category)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -223,7 +223,7 @@ function TemplateForm({
               <SelectContent>
                 {templateCategories.map((category) => (
                   <SelectItem key={category} value={category}>
-                    {category}
+                    {formatTemplateCategory(category)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -289,6 +289,7 @@ function TemplateCard({
       return;
     }
     window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+    toast.success("WhatsApp aberto.");
   }
 
   return (
@@ -298,7 +299,7 @@ function TemplateCard({
           <div>
             <CardTitle className="text-base transition group-hover:text-primary">{template.title}</CardTitle>
             <div className="mt-2 flex flex-wrap gap-2">
-              <Badge variant="secondary">{template.category}</Badge>
+              <Badge variant="secondary">{formatTemplateCategory(template.category)}</Badge>
               <Badge variant={isDefault ? "outline" : "success"}>{isDefault ? "Padrao" : "Meu template"}</Badge>
             </div>
           </div>

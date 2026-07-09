@@ -100,6 +100,33 @@ export const templateVariables = [
   "{proximo_passo}",
 ] as const;
 
+export const templateCategoryLabels = {
+  "Primeiro contato": "Primeiro contato",
+  "Pedido de informacoes": "Pedido de informações",
+  "Cliente com planta": "Cliente com planta",
+  "Cliente sem planta": "Cliente sem planta",
+  "Preco por m2": "Preço por m²",
+  "Agendamento de visita": "Agendamento de visita",
+  "Confirmacao de visita": "Confirmação de visita",
+  "Pos-visita": "Pós-visita",
+  "Follow-up de orcamento": "Follow-up de orçamento",
+  "Cliente sem resposta": "Cliente sem resposta",
+  Reativacao: "Reativação",
+  "Cliente interessado em visita": "Cliente interessado em visita",
+  "Cliente de Google Meu Negocio": "Cliente de Google Meu Negócio",
+  "Cliente vindo do site": "Cliente vindo do site",
+  "Cliente frio": "Cliente frio",
+  "Cliente quente": "Cliente quente",
+  "Obra longe": "Obra longe",
+  "Solicitacao de fotos/planta": "Solicitação de fotos/planta",
+  "Encaminhamento para parceiro/Bruno": "Encaminhamento para parceiro/Bruno",
+  "Fechamento/negociacao": "Fechamento/negociação",
+} satisfies Record<(typeof templateCategories)[number], string>;
+
+export function formatTemplateCategory(category: string) {
+  return templateCategoryLabels[category as keyof typeof templateCategoryLabels] ?? category;
+}
+
 export const profileRoles = ["admin", "partner", "user"] as const;
 
 export const visitStatuses = [

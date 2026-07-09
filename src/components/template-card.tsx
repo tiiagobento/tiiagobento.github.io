@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { WhatsAppButton } from "@/components/whatsapp-button";
 import { applyTemplate } from "@/lib/business";
+import { formatTemplateCategory } from "@/lib/constants";
 import type { Lead, MessageTemplate } from "@/lib/types";
 
 export function TemplateCard({
@@ -30,7 +31,7 @@ export function TemplateCard({
       <CardHeader>
         <CardTitle className="flex items-center justify-between gap-3 text-base">
           {template.title}
-          <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-muted-foreground">{template.category}</span>
+          <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-muted-foreground">{formatTemplateCategory(template.category)}</span>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">

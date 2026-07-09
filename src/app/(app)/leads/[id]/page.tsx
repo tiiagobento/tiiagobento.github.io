@@ -39,7 +39,7 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { useCrmData } from "@/hooks/use-crm-data";
 import { applyTemplate, buildWhatsAppUrl, daysSinceLastContact, isStaleLead, isValidWhatsAppPhone } from "@/lib/business";
-import { interactionTypes, leadStatuses, priorities, templateCategories, visitStatuses } from "@/lib/constants";
+import { formatTemplateCategory, interactionTypes, leadStatuses, priorities, templateCategories, visitStatuses } from "@/lib/constants";
 import { getTemplatesWithDefaults, isDefaultMessageTemplate } from "@/lib/default-message-templates";
 import { interactionSchema } from "@/lib/schemas";
 import { cn, formatCurrency } from "@/lib/utils";
@@ -686,6 +686,7 @@ function LeadTemplatePanel({
     }
     window.open(whatsappUrl, "_blank", "noopener,noreferrer");
     await registerMessageInteraction("aberta no WhatsApp");
+    toast.success(registerInteraction ? "WhatsApp aberto e interação registrada." : "WhatsApp aberto.");
   }
 
   return (
@@ -708,7 +709,7 @@ function LeadTemplatePanel({
                 <SelectItem value="Todas">Todas as categorias</SelectItem>
                 {templateCategories.map((item) => (
                   <SelectItem key={item} value={item}>
-                    {item}
+                    {formatTemplateCategory(item)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -723,7 +724,7 @@ function LeadTemplatePanel({
                 <SelectItem value="none">Escolha um template</SelectItem>
                 {filteredTemplates.map((template) => (
                   <SelectItem key={template.id} value={template.id}>
-                    {template.title} {isDefaultMessageTemplate(template) ? "(padrao)" : ""}
+                    {template.title} {isDefaultMessageTemplate(template) ? "(padrão)" : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -778,6 +779,7 @@ function getMissingTemplateFields(template: string, lead: Lead) {
     ["tipo de obra", template.includes("{tipo_obra}") && !lead.project_type],
     ["data da visita", template.includes("{data_visita}") && !lead.visit_scheduled_at && !lead.next_action_at],
     ["horario da visita", template.includes("{horario_visita}") && !lead.visit_scheduled_at && !lead.next_action_at],
+    ["proximo passo", template.includes("{proximo_passo}") && !lead.next_action_at],
   ];
   return checks.filter(([, missing]) => missing).map(([label]) => label);
 }
