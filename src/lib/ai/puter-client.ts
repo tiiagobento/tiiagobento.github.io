@@ -4,6 +4,7 @@ import type { AIExtractedLead, AILeadAnalysisResult } from "@/lib/validations/ai
 
 const DEFAULT_MODEL = "gpt-5.4-nano";
 const PUTER_LOAD_TIMEOUT_MS = 10_000;
+const PUTER_AUTH_TIMEOUT_MS = 45_000;
 const PUTER_CHAT_TIMEOUT_MS = 75_000;
 
 export type AnalyzeLeadWithPuterInput = {
@@ -47,7 +48,11 @@ export async function ensurePuterAuthorizedFromUserAction() {
   if (auth.isSignedIn()) return;
 
   try {
-    await auth.signIn({ attempt_temp_user_creation: true });
+    await withPuterTimeout(
+      auth.signIn({ attempt_temp_user_creation: true }),
+      PUTER_AUTH_TIMEOUT_MS,
+      "O Puter demorou demais para autorizar. Confira a janela do Puter e tente novamente.",
+    );
   } catch (error) {
     throw normalizePuterError(error, "O Puter pediu login/autorizacao. Conclua o acesso e tente novamente.");
   }
@@ -56,7 +61,11 @@ export async function ensurePuterAuthorizedFromUserAction() {
 export async function analyzeLeadTextWithPuter({ prompt, model = DEFAULT_MODEL }: { prompt: string; model?: string }) {
   const puter = await waitForPuter();
   try {
-    return await withPuterChatTimeout(puter?.ai.chat(prompt, { model }));
+    return await withPuterTimeout(
+      puter?.ai.chat(prompt, { model }),
+      PUTER_CHAT_TIMEOUT_MS,
+      "A IA demorou demais para responder. Verifique se o Puter esta autorizado e tente novamente.",
+    );
   } catch (error) {
     throw normalizePuterError(error, "Nao foi possivel analisar esse texto.");
   }
@@ -65,13 +74,17 @@ export async function analyzeLeadTextWithPuter({ prompt, model = DEFAULT_MODEL }
 export async function analyzeLeadImageWithPuter({ image, prompt, model = DEFAULT_MODEL }: { image: string; prompt: string; model?: string }) {
   const puter = await waitForPuter();
   try {
-    return await withPuterChatTimeout(puter?.ai.chat(prompt, image, { model }));
+    return await withPuterTimeout(
+      puter?.ai.chat(prompt, image, { model }),
+      PUTER_CHAT_TIMEOUT_MS,
+      "A IA demorou demais para responder. Verifique se o Puter esta autorizado e tente novamente.",
+    );
   } catch (error) {
     throw normalizePuterError(error, "Nao foi possivel analisar essa imagem.");
   }
 }
 
-async function withPuterChatTimeout<T>(promise: Promise<T> | undefined) {
+async function withPuterTimeout<T>(promise: Promise<T> | undefined, timeoutMs: number, message: string) {
   if (!promise) {
     throw new Error("Nao consegui iniciar a chamada da IA. Recarregue a pagina e tente novamente.");
   }
@@ -82,8 +95,8 @@ async function withPuterChatTimeout<T>(promise: Promise<T> | undefined) {
       promise,
       new Promise<never>((_, reject) => {
         timeoutId = window.setTimeout(
-          () => reject(new Error("A IA demorou demais para responder. Verifique se o Puter esta autorizado e tente novamente.")),
-          PUTER_CHAT_TIMEOUT_MS,
+          () => reject(new Error(message)),
+          timeoutMs,
         );
       }),
     ]);
