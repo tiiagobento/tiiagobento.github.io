@@ -27,8 +27,8 @@ export function SearchAndFilters({
 }) {
   const set = (key: keyof LeadFilters, value: string) => onChange({ ...filters, [key]: value });
   return (
-    <div className="grid gap-3 rounded-xl border bg-card/90 p-3 shadow-sm lg:grid-cols-[1.5fr_repeat(5,1fr)]">
-      <div className="flex items-center rounded-md border bg-background/80 px-3 shadow-xs">
+    <div className="premium-panel grid gap-3 rounded-xl p-3 lg:grid-cols-[1.5fr_repeat(5,1fr)]">
+      <div className="flex items-center rounded-lg border bg-background/80 px-3 shadow-xs transition focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/15">
         <Search className="mr-2 size-4 text-muted-foreground" />
         <Input className="border-0 bg-transparent px-0 focus-visible:ring-0" placeholder="Buscar por nome, telefone, cidade..." value={filters.query} onChange={(event) => set("query", event.target.value)} />
       </div>

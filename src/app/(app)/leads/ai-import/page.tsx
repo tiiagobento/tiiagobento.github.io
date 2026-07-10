@@ -1,11 +1,14 @@
 import { AILeadImport } from "@/components/ai/AILeadImport";
 import { Card, CardContent } from "@/components/ui/card";
 import { Sparkles } from "lucide-react";
+import { getAIProviderStatus } from "@/lib/ai/provider";
 
 export default function AILeadImportPage() {
+  const serverAI = getAIProviderStatus();
+
   return (
     <div className="mx-auto max-w-6xl space-y-5">
-      <Card className="overflow-hidden border-primary/10 bg-primary text-primary-foreground shadow-lg">
+      <Card className="page-hero">
         <CardContent className="flex flex-col gap-3 p-5 sm:p-6">
           <div className="flex size-11 items-center justify-center rounded-xl bg-white/10 text-accent">
             <Sparkles className="size-5" />
@@ -16,7 +19,7 @@ export default function AILeadImportPage() {
           </div>
         </CardContent>
       </Card>
-      <AILeadImport />
+      <AILeadImport serverAIConfigured={serverAI.configured} serverProvider={serverAI.name} />
     </div>
   );
 }

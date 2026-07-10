@@ -14,15 +14,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useCrmData } from "@/hooks/use-crm-data";
 import { isValidWhatsAppPhone, sanitizePhone } from "@/lib/business";
-import { analyzeLeadWithPuter, ensurePuterAuthorizedFromUserAction, fileToDataUrl, isPuterReady } from "@/lib/ai/puter-client";
+import { analyzeLeadWithPuter, ensurePuterAuthorizedFromUserAction, isPuterReady } from "@/lib/ai/puter-client";
+import { analyzeLeadWithServer } from "@/lib/ai/server-client";
+import { AI_IMAGE_MAX_COUNT, dataUrlToGeminiInlineData, fileToDataUrl, maybeCompressImage, validateImageFile } from "@/lib/ai/image-utils";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import { leadSources, leadStatuses, priorities, projectTypes } from "@/lib/constants";
 import type { LeadFormValues } from "@/lib/schemas";
+import type { Lead } from "@/lib/types";
 import type { AIExtractedLead, AILeadAnalysisResult } from "@/lib/validations/ai-lead-draft";
 
-const MAX_IMAGES = 10;
+const MAX_IMAGES = AI_IMAGE_MAX_COUNT;
 const MAX_TEXT_LENGTH = 20_000;
-const ACCEPTED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/jpg", "image/webp"]);
 const IMAGE_FIELD_GUIDES = [
   "Topo do print/cartao do contato: telefone e nome.",
   "Baloes brancos do cliente: cidade, bairro, obra, terreno, planta e urgencia.",
@@ -48,7 +50,11 @@ const FIELD_HELP: Record<string, string> = {
 };
 
 type UploadedImage = {
+  localId: string;
   name: string;
+  size: number;
+  mimeType: string;
+  data: string;
   dataUrl: string;
 };
 
@@ -58,9 +64,18 @@ type EditableAILead = AIExtractedLead & {
   savedLeadId?: string;
 };
 
-export function AILeadImport() {
+type AIEngine = "server" | "puter";
+
+export function AILeadImport({
+  serverAIConfigured = false,
+  serverProvider = null,
+}: {
+  serverAIConfigured?: boolean;
+  serverProvider?: string | null;
+}) {
   const router = useRouter();
-  const { saveLead } = useCrmData();
+  const { leads: existingLeads, saveLead, updateLead: updateExistingLead } = useCrmData();
+  const [engine, setEngine] = React.useState<AIEngine>(serverAIConfigured ? "server" : "puter");
   const [scriptLoaded, setScriptLoaded] = React.useState(false);
   const [conversation, setConversation] = React.useState("");
   const [source, setSource] = React.useState<LeadFormValues["source"]>("WhatsApp");
@@ -97,12 +112,19 @@ export function AILeadImport() {
 
     setIsAnalyzing(true);
     try {
-      await ensurePuterAuthorizedFromUserAction();
-      const result = await analyzeLeadWithPuter({
+      const input = {
         conversation: trimmedConversation,
         source,
-        images: images.map((image) => image.dataUrl),
-      });
+      };
+      const result = engine === "server"
+        ? await analyzeLeadWithServer({
+          ...input,
+          images: images.map(({ mimeType, data }) => ({ mimeType, data })),
+        })
+        : await analyzeWithPuter({
+          ...input,
+          images: images.map((image) => image.dataUrl),
+        });
       setAnalysis(result);
       setLeads(result.leads.map((lead, index) => ({ ...normalizeExtractedLead(lead, source), localId: `${Date.now()}-${index}` })));
       toast.success("Analise concluida. Revise os leads antes de salvar.");
@@ -123,18 +145,32 @@ export function AILeadImport() {
     if (selected.length === 0) return;
 
     if (images.length + selected.length > MAX_IMAGES) {
-      toast.error("Envie no maximo 10 imagens.");
+      toast.error(`Envie no maximo ${MAX_IMAGES} imagens por analise.`);
       return;
     }
 
-    const invalid = selected.filter((file) => !ACCEPTED_IMAGE_TYPES.has(file.type));
-    if (invalid.length > 0) {
-      toast.error("Envie apenas imagens PNG, JPG, JPEG ou WEBP.");
-      return;
+    for (const file of selected) {
+      const validationError = validateImageFile(file);
+      if (validationError) {
+        toast.error(validationError);
+        return;
+      }
     }
 
     try {
-      const converted = await Promise.all(selected.map(async (file) => ({ name: file.name, dataUrl: await fileToDataUrl(file) })));
+      const converted = await Promise.all(selected.map(async (file) => {
+        const safeFile = await maybeCompressImage(file);
+        const dataUrl = await fileToDataUrl(safeFile);
+        const { mimeType, data } = dataUrlToGeminiInlineData(dataUrl);
+        return {
+          localId: `${Date.now()}-${file.name}-${Math.random()}`,
+          name: file.name,
+          size: file.size,
+          mimeType,
+          data,
+          dataUrl,
+        };
+      }));
       setImages((current) => [...current, ...converted]);
     } catch (error) {
       console.error(error);
@@ -146,8 +182,8 @@ export function AILeadImport() {
     setLeads((current) => current.map((lead) => (lead.localId === localId ? { ...lead, ...input } : lead)));
   }
 
-  function removeImage(name: string) {
-    setImages((current) => current.filter((image) => image.name !== name));
+  function removeImage(localId: string) {
+    setImages((current) => current.filter((image) => image.localId !== localId));
   }
 
   function clearAll() {
@@ -169,6 +205,12 @@ export function AILeadImport() {
       return null;
     }
 
+    const duplicate = findDuplicateLead(existingLeads, lead.phone);
+    if (duplicate) {
+      toast.error("Este telefone ja existe no CRM. Atualize o lead existente ou ignore esse rascunho.");
+      return null;
+    }
+
     updateLead(lead.localId, { saving: true });
     try {
       const saved = await saveLead(mapAILeadToLeadPayload(lead));
@@ -179,6 +221,21 @@ export function AILeadImport() {
       console.error(error);
       updateLead(lead.localId, { saving: false });
       toast.error("Nao foi possivel salvar esse lead.");
+      return null;
+    }
+  }
+
+  async function updateDuplicateLead(lead: EditableAILead, duplicate: Lead) {
+    updateLead(lead.localId, { saving: true });
+    try {
+      const saved = await updateExistingLead(duplicate.id, mapAILeadToLeadPayload(lead));
+      updateLead(lead.localId, { saving: false, savedLeadId: saved.id });
+      toast.success(`Lead existente ${saved.name} atualizado.`);
+      return saved.id;
+    } catch (error) {
+      console.error(error);
+      updateLead(lead.localId, { saving: false });
+      toast.error("Nao foi possivel atualizar o lead existente.");
       return null;
     }
   }
@@ -211,27 +268,31 @@ export function AILeadImport() {
 
   return (
     <div className="space-y-5">
-      <Script
-        src="https://js.puter.com/v2/"
-        strategy="afterInteractive"
-        onLoad={() => setScriptLoaded(true)}
-        onError={() => {
-          const message = "Nao consegui carregar a IA. Verifique sua conexao e tente novamente.";
-          setAnalysisError(message);
-          toast.error(message);
-        }}
-      />
+      {engine === "puter" ? (
+        <Script
+          src="https://js.puter.com/v2/"
+          strategy="afterInteractive"
+          onLoad={() => setScriptLoaded(true)}
+          onError={() => {
+            const message = "Nao consegui carregar a IA. Verifique sua conexao e tente novamente.";
+            setAnalysisError(message);
+            toast.error(message);
+          }}
+        />
+      ) : null}
 
-      <Card>
+      <Card className="overflow-hidden">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Sparkles className="size-5 text-accent" />
-            Analisar conversas com IA
+            Importar leads com IA
           </CardTitle>
-          <CardDescription>Cole texto ou envie prints. A IA gera rascunhos, mas nada e salvo sem revisao.</CardDescription>
+          <CardDescription>
+            Cole uma conversa ou envie prints do WhatsApp, Google Meu Negocio ou Instagram. A IA sugere os dados do lead e voce revisa antes de salvar.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-sm dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
             Revise os dados antes de salvar. A IA pode interpretar alguma informacao de forma errada.
           </div>
 
@@ -240,9 +301,9 @@ export function AILeadImport() {
               "Cole uma conversa ou envie um print",
               "A IA vai sugerir dados do lead",
               "Revise antes de salvar",
-              "A IA pode errar, confirme as informações importantes",
+              "A IA pode errar, confirme nome, telefone e cidade",
             ].map((item) => (
-              <div key={item} className="flex min-h-24 items-start gap-3 rounded-xl border bg-secondary/35 p-4">
+              <div key={item} className="flex min-h-24 items-start gap-3 rounded-xl border bg-secondary/35 p-4 shadow-xs">
                 <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent">
                   <ClipboardCheck className="size-4" />
                 </div>
@@ -252,21 +313,40 @@ export function AILeadImport() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={scriptLoaded || isPuterReady() ? "success" : "secondary"}>{scriptLoaded || isPuterReady() ? "IA carregada" : "Carregando IA"}</Badge>
+            {engine === "server" ? (
+              <Badge variant={serverAIConfigured ? "success" : "warning"}>
+                {serverAIConfigured ? `Servidor: ${formatProviderName(serverProvider)}` : "Servidor nao configurado"}
+              </Badge>
+            ) : (
+              <Badge variant={scriptLoaded || isPuterReady() ? "success" : "secondary"}>
+                {scriptLoaded || isPuterReady() ? "Puter carregado" : "Carregando Puter"}
+              </Badge>
+            )}
             <Badge variant="outline">{images.length}/{MAX_IMAGES} imagens</Badge>
             <Badge variant="outline">{conversation.length.toLocaleString("pt-BR")}/{MAX_TEXT_LENGTH.toLocaleString("pt-BR")} caracteres</Badge>
           </div>
 
-          <div className="rounded-xl border bg-card p-4">
-            <h3 className="text-sm font-semibold">Como a IA vai ler o print</h3>
+          <div className="rounded-xl border bg-card/88 p-4 shadow-inner shadow-slate-950/[0.02]">
+            <h3 className="text-sm font-semibold text-primary">Como a IA vai ler o print</h3>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               {IMAGE_FIELD_GUIDES.map((guide) => (
-                <div key={guide} className="rounded-lg bg-secondary/45 px-3 py-2 text-xs leading-5 text-muted-foreground">
+                <div key={guide} className="rounded-lg bg-secondary/45 px-3 py-2 text-xs leading-5 text-muted-foreground ring-1 ring-border/50">
                   {guide}
                 </div>
               ))}
             </div>
           </div>
+
+          <Field label="Modo de IA" hint="A IA via servidor usa a chave protegida na Vercel. O Puter pede autorizacao no navegador.">
+            <div className="grid grid-cols-2 gap-1 rounded-lg border bg-secondary/45 p-1" role="group" aria-label="Modo de IA">
+              <Button type="button" variant={engine === "server" ? "default" : "ghost"} onClick={() => setEngine("server")} aria-pressed={engine === "server"}>
+                IA via servidor
+              </Button>
+              <Button type="button" variant={engine === "puter" ? "default" : "ghost"} onClick={() => setEngine("puter")} aria-pressed={engine === "puter"}>
+                Puter no navegador
+              </Button>
+            </div>
+          </Field>
 
           <Field label="Origem do lead">
             <Select value={source} onValueChange={(value) => setSource(value as LeadFormValues["source"])}>
@@ -292,14 +372,14 @@ export function AILeadImport() {
             />
           </Field>
 
-          <Field label="Prints ou imagens">
-            <div className="rounded-xl border bg-card p-4">
+          <Field label="Enviar prints da conversa">
+            <div className="rounded-xl border bg-card/88 p-4 shadow-inner shadow-slate-950/[0.02]">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="text-sm text-muted-foreground">
-                  <p>PNG, JPG, JPEG ou WEBP. Maximo de 10 imagens.</p>
+                  <p>PNG, JPG, JPEG ou WEBP. Maximo de {MAX_IMAGES} imagens, 5 MB por arquivo.</p>
                   <p>As imagens sao usadas apenas na analise e nao sao salvas no banco.</p>
                 </div>
-                <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-medium hover:bg-secondary">
+                <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm font-medium shadow-xs transition hover:-translate-y-0.5 hover:bg-secondary hover:shadow-sm">
                   <Upload className="size-4" />
                   Selecionar imagens
                   <input className="sr-only" type="file" accept="image/png,image/jpeg,image/jpg,image/webp" multiple onChange={handleImagesChange} />
@@ -309,12 +389,15 @@ export function AILeadImport() {
               {images.length ? (
                 <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   {images.map((image) => (
-                    <div key={image.name} className="overflow-hidden rounded-xl border bg-background">
+                    <div key={image.localId} className="overflow-hidden rounded-xl border bg-background shadow-sm">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={image.dataUrl} alt={`Preview ${image.name}`} className="h-40 w-full object-cover" />
                       <div className="flex items-center justify-between gap-2 p-2">
-                        <span className="truncate text-xs text-muted-foreground">{image.name}</span>
-                        <Button type="button" size="icon" variant="ghost" onClick={() => removeImage(image.name)} aria-label="Remover imagem">
+                        <span className="min-w-0 text-xs text-muted-foreground">
+                          <span className="block truncate">{image.name}</span>
+                          <span>{formatFileSize(image.size)}</span>
+                        </span>
+                        <Button type="button" size="icon" variant="ghost" onClick={() => removeImage(image.localId)} aria-label="Remover imagem">
                           <Trash2 className="size-4 text-destructive" />
                         </Button>
                       </div>
@@ -340,7 +423,7 @@ export function AILeadImport() {
           <div className="flex flex-col gap-2 sm:flex-row">
             <Button type="button" onClick={analyzeConversation} disabled={isAnalyzing}>
               {isAnalyzing ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-              {isAnalyzing ? "Analisando com IA..." : "Analisar com IA"}
+              {isAnalyzing ? `Analisando via ${engine === "server" ? "servidor" : "Puter"}...` : "Analisar com IA"}
             </Button>
             {analysisError ? (
               <Button type="button" variant="outline" onClick={analyzeConversation} disabled={isAnalyzing || !hasInput}>
@@ -357,7 +440,7 @@ export function AILeadImport() {
       </Card>
 
       {analysis ? (
-        <Card>
+        <Card className="border-accent/20">
           <CardHeader>
             <CardTitle>Resultado da IA</CardTitle>
             <CardDescription>Revise cada campo antes de salvar no Supabase.</CardDescription>
@@ -369,6 +452,10 @@ export function AILeadImport() {
               <Button type="button" variant="outline" onClick={copySummary}>
                 <ClipboardCopy className="size-4" />
                 Copiar resumo
+              </Button>
+              <Button type="button" variant="outline" onClick={clearAll}>
+                <Trash2 className="size-4" />
+                Descartar
               </Button>
               <Button type="button" onClick={saveAllLeads} disabled={isSavingAll || leads.length === 0}>
                 {isSavingAll ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
@@ -382,7 +469,15 @@ export function AILeadImport() {
       {leads.length ? (
         <div className="grid gap-4 xl:grid-cols-2">
           {leads.map((lead, index) => (
-            <LeadDraftCard key={lead.localId} lead={lead} index={index} onChange={(input) => updateLead(lead.localId, input)} onSave={() => saveOneLead(lead)} />
+            <LeadDraftCard
+              key={lead.localId}
+              lead={lead}
+              index={index}
+              duplicateLead={findDuplicateLead(existingLeads, lead.phone)}
+              onChange={(input) => updateLead(lead.localId, input)}
+              onSave={() => saveOneLead(lead)}
+              onUpdateDuplicate={(duplicate) => updateDuplicateLead(lead, duplicate)}
+            />
           ))}
         </div>
       ) : analysis ? (
@@ -394,19 +489,39 @@ export function AILeadImport() {
   );
 }
 
+async function analyzeWithPuter(input: { conversation: string; source: string; images: string[] }) {
+  await ensurePuterAuthorizedFromUserAction();
+  return analyzeLeadWithPuter(input);
+}
+
+function formatProviderName(provider: string | null) {
+  const names: Record<string, string> = {
+    gemini: "Gemini",
+    groq: "Groq",
+    openrouter: "OpenRouter",
+    huggingface: "Hugging Face",
+    mock: "Mock",
+  };
+  return provider ? names[provider] ?? provider : "configurado";
+}
+
 function LeadDraftCard({
   lead,
   index,
+  duplicateLead,
   onChange,
   onSave,
+  onUpdateDuplicate,
 }: {
   lead: EditableAILead;
   index: number;
+  duplicateLead?: Lead;
   onChange: (input: Partial<EditableAILead>) => void;
   onSave: () => Promise<unknown>;
+  onUpdateDuplicate: (duplicate: Lead) => Promise<unknown>;
 }) {
   return (
-    <Card className="h-full">
+    <Card className="premium-hover h-full">
       <CardHeader>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -421,6 +536,11 @@ function LeadDraftCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {duplicateLead && !lead.savedLeadId ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
+            Este telefone ja existe no CRM em {duplicateLead.name}. Revise antes de atualizar para evitar duplicidade.
+          </div>
+        ) : null}
         <div className="grid gap-3 md:grid-cols-2">
           <EditableField label="Nome" value={lead.name} onChange={(value) => onChange({ name: value })} />
           <EditableField label="Telefone" value={lead.phone} onChange={(value) => onChange({ phone: value })} />
@@ -442,6 +562,12 @@ function LeadDraftCard({
           <Textarea value={lead.notes} onChange={(event) => onChange({ notes: event.target.value })} className="min-h-28" />
         </Field>
         <div className="flex justify-end">
+          {duplicateLead && !lead.savedLeadId ? (
+            <Button type="button" variant="outline" onClick={() => onUpdateDuplicate(duplicateLead)} disabled={lead.saving} className="mr-2">
+              {lead.saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+              Atualizar existente
+            </Button>
+          ) : null}
           <Button type="button" onClick={onSave} disabled={lead.saving || Boolean(lead.savedLeadId)}>
             {lead.saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
             {lead.savedLeadId ? "Lead salvo" : "Salvar lead"}
@@ -450,6 +576,18 @@ function LeadDraftCard({
       </CardContent>
     </Card>
   );
+}
+
+function findDuplicateLead(leads: Lead[], phone: string) {
+  const sanitized = sanitizePhone(phone);
+  if (!sanitized || sanitized.length < 10) return undefined;
+  return leads.find((lead) => sanitizePhone(lead.phone) === sanitized);
+}
+
+function formatFileSize(size: number) {
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / 1024 / 1024).toFixed(1)} MB`;
 }
 
 function normalizeExtractedLead(lead: AIExtractedLead, fallbackSource: LeadFormValues["source"]): AIExtractedLead {

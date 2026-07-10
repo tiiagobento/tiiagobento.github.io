@@ -105,7 +105,7 @@ export default function TemplatesPage() {
 
   return (
     <div className="space-y-5">
-      <Card className="overflow-hidden border-primary/10 bg-primary text-primary-foreground shadow-lg">
+      <Card className="page-hero">
         <CardContent className="flex flex-col gap-3 p-5 sm:p-6">
           <div className="flex size-11 items-center justify-center rounded-xl bg-white/10 text-accent">
             <MessageSquarePlus className="size-5" />
@@ -235,7 +235,7 @@ function TemplateForm({
           </Field>
           <div className="flex flex-wrap gap-2">
             {templateVariables.map((variable) => (
-              <button key={variable} type="button" onClick={() => onInsertVariable(variable)} className="rounded-full border bg-secondary px-2.5 py-1 text-xs font-medium hover:bg-secondary/70">
+              <button key={variable} type="button" onClick={() => onInsertVariable(variable)} className="rounded-full border bg-secondary px-2.5 py-1 text-xs font-medium transition hover:-translate-y-0.5 hover:bg-secondary/70 hover:shadow-sm">
                 {variable}
               </button>
             ))}
@@ -298,10 +298,10 @@ function TemplateCard({
   }
 
   return (
-    <Card className="group h-full transition duration-200 hover:-translate-y-0.5 hover:shadow-lg">
+    <Card className="premium-hover group h-full overflow-hidden">
       <CardHeader>
         <div className="flex items-start justify-between gap-3">
-          <div>
+          <div className="min-w-0">
             <CardTitle className="text-base transition group-hover:text-primary">{template.title}</CardTitle>
             <div className="mt-2 flex flex-wrap gap-2">
               <Badge variant="secondary">{formatTemplateCategory(template.category)}</Badge>
@@ -321,13 +321,13 @@ function TemplateCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="min-h-36 whitespace-pre-line rounded-xl border bg-secondary/45 p-3 text-sm leading-6 shadow-inner">{renderedMessage}</div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={copyMessage}>
+        <div className="min-h-36 whitespace-pre-line rounded-xl border bg-secondary/35 p-3 text-sm leading-6 shadow-inner shadow-slate-950/[0.03]">{renderedMessage}</div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <Button variant="outline" onClick={copyMessage} className="sm:flex-1">
             <Copy className="size-4" />
             Copiar mensagem
           </Button>
-          <Button type="button" variant="accent" onClick={openWhatsApp}>
+          <Button type="button" variant="accent" onClick={openWhatsApp} className="sm:flex-1">
             <MessageCircle className="size-4" />
             Abrir WhatsApp
           </Button>
@@ -405,7 +405,7 @@ function VariablesCard() {
       </CardHeader>
       <CardContent className="flex flex-wrap gap-2">
         {templateVariables.map((variable) => (
-          <span key={variable} className={cn("rounded-full border bg-card px-2.5 py-1 text-xs font-semibold text-primary shadow-xs")}>
+          <span key={variable} className={cn("rounded-full border bg-card px-2.5 py-1 text-xs font-semibold text-primary shadow-xs ring-1 ring-border/40")}>
             {variable}
           </span>
         ))}

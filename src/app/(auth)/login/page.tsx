@@ -122,18 +122,29 @@ export default function LoginPage() {
 }
 
 function AuthError({ message }: { message: string }) {
-  return <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{message}</div>;
+  return <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{message}</div>;
 }
 
 function AuthShell({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top_left,#fff7ed,transparent_34%),linear-gradient(135deg,#12323b,#172027)] p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>{title}</CardTitle>
+    <main className="flex min-h-screen items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(184,117,53,0.32),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.14),transparent_28%),linear-gradient(135deg,#0d2b36,#172027)] p-4">
+      <Card className="grid w-full max-w-5xl overflow-hidden border-white/10 bg-white/96 shadow-2xl shadow-slate-950/30 md:grid-cols-[1fr_1.05fr] dark:border-white/10 dark:bg-card/95 dark:shadow-black/50">
+        <div className="hidden bg-primary p-8 text-primary-foreground md:flex md:flex-col md:justify-between">
+          <div>
+            <div className="flex size-12 items-center justify-center rounded-xl bg-accent font-bold text-accent-foreground shadow-lg shadow-accent/20">NF</div>
+            <h1 className="mt-6 text-3xl font-semibold">Nova Forma CRM</h1>
+            <p className="mt-3 max-w-sm text-sm leading-6 text-white/68">Controle comercial para leads, visitas, orcamentos e follow-ups em steel frame.</p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-white/8 p-4 text-sm text-white/72">Operacao segura com Supabase Auth e dados reais do CRM.</div>
+        </div>
+        <div>
+        <CardHeader className="space-y-2 p-6 sm:p-8">
+          <div className="mb-2 flex size-11 items-center justify-center rounded-xl bg-primary font-bold text-primary-foreground md:hidden">NF</div>
+          <CardTitle className="text-2xl">{title}</CardTitle>
           <CardDescription>{description}</CardDescription>
         </CardHeader>
-        <CardContent>{children}</CardContent>
+        <CardContent className="p-6 pt-0 sm:p-8 sm:pt-0">{children}</CardContent>
+        </div>
       </Card>
     </main>
   );

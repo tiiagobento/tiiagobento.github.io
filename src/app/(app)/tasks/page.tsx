@@ -148,7 +148,7 @@ export default function TasksPage() {
 
   return (
     <div className="space-y-5">
-      <Card className="overflow-hidden border-primary/10 bg-primary text-primary-foreground shadow-lg">
+      <Card className="page-hero">
         <CardContent className="flex flex-col gap-3 p-5 sm:p-6">
           <div className="flex size-11 items-center justify-center rounded-xl bg-white/10 text-accent">
             <ClipboardList className="size-5" />
@@ -276,7 +276,7 @@ export default function TasksPage() {
 
 function TaskMetric({ title, value, tone = "default" }: { title: string; value: number; tone?: "default" | "danger" | "success" }) {
   return (
-    <Card className={cn("transition duration-200 hover:-translate-y-0.5 hover:shadow-lg", tone === "danger" && "border-red-200 bg-red-50/50 dark:bg-red-950/10", tone === "success" && "border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/10")}>
+    <Card className={cn("transition duration-200 hover:-translate-y-0.5 hover:shadow-lg", tone === "danger" && "border-red-200 bg-red-50/50 dark:border-red-900/60 dark:bg-red-950/18", tone === "success" && "border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/60 dark:bg-emerald-950/18")}>
       <CardContent className="flex items-center justify-between p-4">
         <div>
           <p className="text-sm text-muted-foreground">{title}</p>
@@ -544,7 +544,7 @@ function TaskCard({
   const displayDate = formatTaskDate(task.due_date);
 
   return (
-    <div className={cn("rounded-xl border bg-card p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md", overdue && "border-red-200 bg-red-50/50 dark:bg-red-950/10")}>
+    <div className={cn("rounded-xl border bg-card p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md", overdue && "border-red-200 bg-red-50/50 dark:border-red-900/60 dark:bg-red-950/18")}>
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -688,7 +688,7 @@ function AutomationLeadCard({
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-semibold">{lead.name}</h3>
             {alreadyCreated ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-950/35 dark:text-emerald-200 dark:ring-1 dark:ring-emerald-900/50">
                 <CheckCircle2 className="size-3" />
                 roteiro criado
               </span>

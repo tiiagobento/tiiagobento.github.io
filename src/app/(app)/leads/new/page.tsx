@@ -16,7 +16,7 @@ export default function NewLeadPage() {
   }
   return (
     <div className="mx-auto max-w-5xl space-y-5">
-      <Card className="overflow-hidden border-primary/10 bg-primary text-primary-foreground shadow-lg">
+      <Card className="page-hero">
         <CardContent className="flex flex-col gap-3 p-5 sm:p-6">
           <div className="flex size-11 items-center justify-center rounded-xl bg-white/10 text-accent">
             <Plus className="size-5" />

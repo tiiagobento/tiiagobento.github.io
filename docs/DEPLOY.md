@@ -20,6 +20,9 @@ Configure localmente em `.env.local` e na Vercel em Project Settings > Environme
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://SEU-PROJETO.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=SUA_ANON_PUBLIC_KEY
+
+AI_PROVIDER=gemini
+GEMINI_API_KEY=SUA_CHAVE_SECRETA
 ```
 
 Opcionalmente, projetos Supabase novos podem mostrar uma chave publicavel com outro nome. A aplicacao tambem aceita:
@@ -196,7 +199,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=SUA_ANON_PUBLIC_KEY
 
 Depois de criar ou alterar variaveis, rode Redeploy.
 
-Para este projeto, cadastre as duas variaveis em Production, Preview e Development. Nao cadastre `VERCEL_OIDC_TOKEN` manualmente e nao adicione `SUPABASE_SERVICE_ROLE_KEY`, pois o fluxo atual nao precisa dela.
+Para este projeto, cadastre as variaveis do Supabase e as variaveis do provider de IA em Production, Preview e Development. Nao cadastre `VERCEL_OIDC_TOKEN` manualmente e nao adicione `SUPABASE_SERVICE_ROLE_KEY`, pois o fluxo atual nao precisa dela.
 
 ### 4. Dominio Personalizado
 
@@ -206,7 +209,83 @@ Se houver dominio proprio:
 2. Ajuste DNS conforme instrucoes da Vercel.
 3. Adicione o dominio nas Redirect URLs do Supabase.
 
-## IA com Puter.js
+## IA via servidor e Puter.js
+
+A tela `/leads/ai-import` oferece dois modos:
+
+- `IA via servidor`: chama `/api/ai/extract-leads`; a chave fica protegida no runtime da Vercel.
+- `Puter no navegador`: usa `https://js.puter.com/v2/` no client-side e pode pedir autorizacao ao usuario.
+
+A rota `/api/ai/generate-message` usa a mesma configuracao server-side para devolver uma mensagem em JSON. As duas API Routes exigem sessao Supabase valida, usam timeout e validam a resposta antes de devolve-la ao frontend.
+
+### Variaveis de IA
+
+Escolha um provider:
+
+```env
+AI_PROVIDER=gemini
+```
+
+Configure somente a chave correspondente:
+
+```env
+GEMINI_API_KEY=
+GROQ_API_KEY=
+OPENROUTER_API_KEY=
+HUGGINGFACE_API_KEY=
+```
+
+Providers aceitos:
+
+- `gemini`
+- `groq`
+- `openrouter`
+- `huggingface`
+- `mock`
+
+`AI_PROVIDER=mock` nao usa chave e serve apenas para desenvolvimento/testes. Para trocar o modelo padrao sem alterar codigo, use opcionalmente `GEMINI_MODEL`, `GROQ_MODEL`, `OPENROUTER_MODEL` ou `HUGGINGFACE_MODEL`.
+
+Nunca use `NEXT_PUBLIC_` nas chaves de IA. Depois de alterar variaveis na Vercel, execute um novo deploy.
+
+### Como obter uma chave/free tier
+
+Os limites gratuitos podem mudar. Confirme o plano e os limites atuais antes de usar em producao.
+
+#### Gemini
+
+1. Acesse [Google AI Studio - API Keys](https://aistudio.google.com/apikey).
+2. Crie uma auth key para a Gemini API.
+3. Configure `AI_PROVIDER=gemini` e `GEMINI_API_KEY`.
+4. Consulte a [documentacao oficial de chaves](https://ai.google.dev/gemini-api/docs/api-key) e os [precos/free tier](https://ai.google.dev/gemini-api/docs/pricing).
+
+Modelo padrao: `gemini-2.5-flash`. Use Gemini para a analise server-side de prints/imagens.
+
+#### Groq
+
+1. Acesse [Groq Console - API Keys](https://console.groq.com/keys).
+2. Crie uma chave.
+3. Configure `AI_PROVIDER=groq` e `GROQ_API_KEY`.
+4. Consulte os [limites oficiais do plano gratuito](https://console.groq.com/docs/rate-limits).
+
+Modelo padrao: `meta-llama/llama-4-scout-17b-16e-instruct`.
+
+#### OpenRouter
+
+1. Acesse [OpenRouter - API Keys](https://openrouter.ai/settings/keys).
+2. Crie uma chave.
+3. Configure `AI_PROVIDER=openrouter` e `OPENROUTER_API_KEY`.
+4. O app usa `openrouter/free`; consulte o [Free Models Router](https://openrouter.ai/docs/cookbook/get-started/free-models-router-playground) e os [limites oficiais](https://openrouter.ai/docs/api/reference/limits).
+
+#### Hugging Face
+
+1. Acesse [Hugging Face - Access Tokens](https://huggingface.co/settings/tokens).
+2. Crie um token separado para o app, com permissao de inference.
+3. Configure `AI_PROVIDER=huggingface` e `HUGGINGFACE_API_KEY`.
+4. Consulte [User Access Tokens](https://huggingface.co/docs/hub/en/security-tokens) e [Inference Providers](https://huggingface.co/docs/inference-providers/en/index).
+
+Modelo padrao: `zai-org/GLM-4.5V:fastest`. A disponibilidade e os creditos dependem da conta e do provider de inferencia escolhido pelo Hugging Face.
+
+### Puter
 
 A importacao com IA em `/leads/ai-import` roda no client-side usando:
 
@@ -214,13 +293,16 @@ A importacao com IA em `/leads/ai-import` roda no client-side usando:
 https://js.puter.com/v2/
 ```
 
-Nao precisa configurar:
+O Puter nao usa as chaves server-side. O script e carregado apenas quando o usuario seleciona o modo Puter, portanto nao quebra o build server-side. No primeiro uso, o Puter pode pedir login/autorizacao em uma janela propria.
 
-- `OPENAI_API_KEY`
-- `GEMINI_API_KEY`
-- chave Puter no `.env`
+### Analise de prints
 
-O script e carregado apenas na pagina/componente da IA via `next/script`, portanto nao quebra o build server-side. No primeiro uso, o Puter pode pedir login/autorizacao em uma janela propria.
+Na tela `/leads/ai-import`, o usuario pode enviar ate 5 prints PNG/JPG/WEBP de ate 5 MB cada. O navegador converte cada arquivo em data URL, a API recebe somente `mimeType` + base64, valida a sessao Supabase e chama o provider.
+
+- `gemini`: suporta texto + imagem via `inlineData`.
+- `mock`: suporta imagem para desenvolvimento, sem IA real.
+- `groq`, `openrouter` e `huggingface`: aceitam imagem somente quando o modelo configurado indicar suporte visual. Caso contrario, a API retorna: `O provider atual nao suporta analise de imagem. Use Gemini ou Puter para analisar prints.`
+- `Puter`: continua como alternativa client-side para imagens quando o usuario autorizar o Puter no navegador.
 
 ## Comandos Locais
 
@@ -256,3 +338,38 @@ npm.cmd run build
 11. Teste `/leads/ai-import` com texto e/ou print.
 12. Crie o usuario Bruno, promova para `partner`, atribua um lead a ele e teste `/partner`.
 13. Confirme que usuario deslogado tentando acessar `/dashboard`, `/leads` ou `/partner` e redirecionado para `/login`.
+
+## PWA, Offline e APK Android
+
+O deploy da Vercel tambem e a origem usada pelo APK Capacitor:
+
+```text
+https://nova-forma-crm.vercel.app
+```
+
+Arquivos principais:
+
+- `src/app/manifest.ts`
+- `public/sw.js`
+- `public/offline.html`
+- `src/lib/offline/*`
+- `capacitor.config.ts`
+
+Fluxo recomendado:
+
+```bash
+npm install
+npm run typecheck
+npm run lint
+npm run test
+npm run build
+npm run android:sync
+npm run android:debug
+```
+
+O primeiro carregamento no APK precisa de internet. Depois, o service worker e o IndexedDB permitem abrir telas ja cacheadas, ver dados sincronizados e registrar operacoes pendentes.
+
+Detalhes completos:
+
+- `docs/OFFLINE_MODE.md`
+- `docs/ANDROID_APK.md`

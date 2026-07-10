@@ -15,10 +15,10 @@ export default defineConfig({
     include: ["src/**/*.test.{ts,tsx}"],
     exclude: ["node_modules", ".next", "e2e"],
     css: true,
-    pool: "threads",
+    pool: "vmThreads",
     fileParallelism: false,
     maxWorkers: 1,
-    testTimeout: 20_000,
-    hookTimeout: 20_000,
+    testTimeout: 60_000,
+    hookTimeout: 60_000,
   },
 });

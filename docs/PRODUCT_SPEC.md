@@ -1,6 +1,6 @@
 # Nova Forma CRM - Product Spec
 
-## Preencher Lead com IA usando Puter.js
+## Preencher Lead com IA configuravel
 
 A rota `/leads/ai-import` permite que o usuario cole uma conversa ou envie prints de WhatsApp/Google Meu Negocio para gerar um rascunho de lead com IA.
 
@@ -8,24 +8,32 @@ A rota `/leads/ai-import` permite que o usuario cole uma conversa ou envie print
 
 1. O usuario informa a origem do lead, cola a conversa e/ou seleciona imagens.
 2. A chamada para IA acontece somente no clique em `Analisar conversa`.
-3. O componente carrega `https://js.puter.com/v2/` apenas nessa tela e usa `puter.ai.chat()` com o modelo `gpt-5.4-nano`.
-4. Prints locais sao convertidos em data URL com `FileReader.readAsDataURL` antes da chamada ao Puter.
-5. A resposta da IA deve ser JSON valido, e o app tenta extrair um bloco JSON caso venha texto adicional.
-6. O JSON e validado com Zod antes de renderizar os cards editaveis.
-7. O usuario revisa todos os campos, resumo e avisos antes de salvar.
-8. Leads so sao salvos quando o usuario clica em `Salvar lead` ou `Salvar todos os leads`.
+3. O usuario escolhe entre `IA via servidor` e `Puter no navegador`.
+4. Quando `AI_PROVIDER` e a chave correspondente estao configurados, a tela usa o servidor por padrao.
+5. O modo servidor chama `/api/ai/extract-leads`, e as chaves nunca chegam ao bundle client.
+6. O modo Puter carrega `https://js.puter.com/v2/` apenas nessa tela e usa `puter.ai.chat()` com o modelo `gpt-5.4-nano`.
+7. Prints locais sao convertidos em data URL com `FileReader.readAsDataURL`; no modo servidor, a API recebe somente `mimeType` + base64.
+8. A resposta deve ser JSON valido, e o app tenta extrair um bloco JSON caso venha texto adicional.
+9. O JSON e validado com Zod antes de renderizar os cards editaveis.
+10. O usuario revisa todos os campos, resumo e avisos antes de salvar.
+11. Leads so sao salvos quando o usuario clica em `Salvar lead` ou `Salvar todos os leads`.
 
 ### Regras de seguranca e UX
 
 - A IA nao salva lead automaticamente.
 - Imagens brutas nao sao salvas no banco.
-- O limite e de 10 imagens e 20.000 caracteres de texto.
+- O limite e de 5 imagens, 5 MB por imagem e 20.000 caracteres de texto.
 - Sao aceitas apenas imagens PNG, JPG, JPEG e WEBP.
 - Nao e permitido analisar quando nao ha texto nem imagem.
 - A revisao acontece em cards editaveis, sem salvar automaticamente.
 - O salvamento reutiliza `saveLead`, mantendo sanitizacao de telefone, calculo de score e persistencia real no Supabase.
 - A tela mostra aviso claro para revisao humana antes de salvar.
-- Puter.js roda somente no client-side; nao ha API Route nem Server Component chamando `window.puter`.
+- Puter.js roda somente no client-side; API Routes nunca chamam `window.puter`.
+- Gemini, Groq, OpenRouter e Hugging Face rodam apenas nas API Routes server-side.
+- Gemini e Mock suportam prints diretamente; Groq, OpenRouter e Hugging Face retornam erro amigavel quando o modelo configurado nao indicar suporte visual.
+- A tela avisa quando o telefone extraido ja existe no CRM e permite atualizar o lead existente para evitar duplicidade.
+- As API Routes exigem sessao Supabase valida e aplicam timeout.
+- `AI_PROVIDER=mock` devolve dados deterministicos apenas para desenvolvimento.
 
 ### Campos extraidos
 

@@ -1,6 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useCrmData } from "@/hooks/use-crm-data";
 import { leadFixture } from "@/test/fixtures";
 import type { Lead } from "@/lib/types";
 
@@ -60,6 +59,7 @@ function createTableBuilder(table: string) {
 
 const supabaseMocks = vi.hoisted(() => ({
   getUser: vi.fn(async () => ({ data: { user: { id: "user-1", email: "tiago@example.com" } }, error: null })),
+  getSession: vi.fn(async () => ({ data: { session: { user: { id: "user-1", email: "tiago@example.com" } } }, error: null })),
   signOut: vi.fn(async () => ({ error: null })),
   from: vi.fn(),
 }));
@@ -68,7 +68,29 @@ vi.mock("sonner", () => ({
   toast: {
     success: vi.fn(),
     error: vi.fn(),
+    info: vi.fn(),
   },
+}));
+
+vi.mock("@/lib/offline/db", () => ({
+  clearOfflineDbForUser: vi.fn(),
+}));
+
+vi.mock("@/lib/offline/network-status", () => ({
+  useNetworkStatus: () => ({ online: true, lastChangedAt: "2026-07-10T00:00:00.000Z" }),
+}));
+
+vi.mock("@/lib/offline/offline-store", () => ({
+  loadCrmSnapshot: vi.fn(async () => null),
+  putLocalRecord: vi.fn(async () => undefined),
+  saveCrmSnapshot: vi.fn(async () => undefined),
+}));
+
+vi.mock("@/lib/offline/sync-queue", () => ({
+  enqueueOperation: vi.fn(async () => null),
+  getSyncSummary: vi.fn(async () => ({ pending: 0, failed: 0, conflict: 0, operations: [] })),
+  retryFailedOperations: vi.fn(async () => undefined),
+  syncPendingOperations: vi.fn(async () => ({ synced: 0, failed: 0 })),
 }));
 
 vi.mock("@/lib/supabase/client", () => ({
@@ -76,11 +98,18 @@ vi.mock("@/lib/supabase/client", () => ({
   supabase: {
     auth: {
       getUser: supabaseMocks.getUser,
+      getSession: supabaseMocks.getSession,
       signOut: supabaseMocks.signOut,
     },
     from: supabaseMocks.from,
   },
 }));
+
+async function renderCrmHook() {
+  vi.resetModules();
+  const { useCrmData } = await import("@/hooks/use-crm-data");
+  return renderHook(() => useCrmData());
+}
 
 describe("useCrmData CRUD", () => {
   beforeEach(() => {
@@ -93,12 +122,13 @@ describe("useCrmData CRUD", () => {
     db.updates = [];
     vi.clearAllMocks();
     supabaseMocks.getUser.mockResolvedValue({ data: { user: { id: "user-1", email: "tiago@example.com" } }, error: null });
+    supabaseMocks.getSession.mockResolvedValue({ data: { session: { user: { id: "user-1", email: "tiago@example.com" } } }, error: null });
     supabaseMocks.signOut.mockResolvedValue({ error: null });
     supabaseMocks.from.mockImplementation((table: string) => createTableBuilder(table));
   });
 
   it("creates and edits leads through Supabase upsert", async () => {
-    const { result } = renderHook(() => useCrmData());
+    const { result } = await renderCrmHook();
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     await act(async () => {
@@ -126,7 +156,7 @@ describe("useCrmData CRUD", () => {
   });
 
   it("deletes leads through Supabase delete", async () => {
-    const { result } = renderHook(() => useCrmData());
+    const { result } = await renderCrmHook();
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     await act(async () => {
@@ -137,7 +167,7 @@ describe("useCrmData CRUD", () => {
   });
 
   it("records last contact through lead update", async () => {
-    const { result } = renderHook(() => useCrmData());
+    const { result } = await renderCrmHook();
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     await act(async () => {
@@ -149,7 +179,7 @@ describe("useCrmData CRUD", () => {
   });
 
   it("creates interaction, updates lead last contact and creates follow-up task", async () => {
-    const { result } = renderHook(() => useCrmData());
+    const { result } = await renderCrmHook();
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     await act(async () => {

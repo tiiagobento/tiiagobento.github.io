@@ -31,6 +31,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { LeadPriorityBadge, LeadScoreBadge, LeadStatusBadge } from "@/components/lead-badges";
+import { LeadCard } from "@/components/lead-card";
 import { WhatsAppButton } from "@/components/whatsapp-button";
 import { SearchAndFilters, type LeadFilters } from "@/components/search-and-filters";
 import { interactionTypes, leadStatuses, priorities } from "@/lib/constants";
@@ -166,7 +167,7 @@ export function LeadTable({ leads, onDelete, onUpdateLead, onRecordLastContact, 
       {
         id: "flags",
         header: "Alertas",
-        cell: ({ row }) => (isStaleLead(row.original) ? <span className="rounded-full bg-red-50 px-2 py-1 text-xs font-medium text-red-700">Parado +3d</span> : <span className="text-xs text-muted-foreground">Em dia</span>),
+        cell: ({ row }) => (isStaleLead(row.original) ? <span className="rounded-full bg-red-50 px-2 py-1 text-xs font-medium text-red-700 dark:bg-red-950/35 dark:text-red-200 dark:ring-1 dark:ring-red-900/50">Parado +3d</span> : <span className="text-xs text-muted-foreground">Em dia</span>),
       },
       {
         id: "actions",
@@ -217,7 +218,16 @@ export function LeadTable({ leads, onDelete, onUpdateLead, onRecordLastContact, 
   return (
     <div className="space-y-4">
       <SearchAndFilters filters={filters} onChange={setFilters} cities={cities} assignees={assignees} />
-      <div className="overflow-hidden rounded-xl border bg-card/95 shadow-sm">
+      <div className="grid gap-3 lg:hidden">
+        {filteredLeads.length ? (
+          filteredLeads.map((lead) => <LeadCard key={lead.id} lead={lead} />)
+        ) : (
+          <div className="rounded-xl border border-dashed bg-card/80 p-6 text-center text-sm text-muted-foreground">
+            Nenhum lead encontrado com os filtros atuais.
+          </div>
+        )}
+      </div>
+      <div className="hidden overflow-hidden rounded-xl border bg-card/95 shadow-sm lg:block">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1100px] text-sm">
             <thead className="bg-primary text-primary-foreground">

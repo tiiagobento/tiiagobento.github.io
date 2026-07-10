@@ -1,8 +1,38 @@
 import { z } from "zod";
 
-const nullableString = z.string().nullable();
-const nullableNumber = z.number().nullable();
-const nullableBoolean = z.boolean().nullable();
+const nullableString = z.preprocess((value) => {
+  if (value === undefined || value === "") return null;
+  if (value === null) return null;
+  return String(value);
+}, z.string().nullable());
+const nullableNumber = z.preprocess((value) => {
+  if (value === undefined || value === null || value === "") return null;
+  const numeric = typeof value === "number" ? value : Number(String(value).replace(",", "."));
+  return Number.isFinite(numeric) ? numeric : null;
+}, z.number().nullable());
+const nullableBoolean = z.preprocess((value) => {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value === "boolean") return value;
+  const normalized = String(value).trim().toLowerCase();
+  if (["true", "sim", "yes", "1"].includes(normalized)) return true;
+  if (["false", "nao", "não", "no", "0"].includes(normalized)) return false;
+  return null;
+}, z.boolean().nullable());
+const aiString = z.preprocess((value) => {
+  if (value === undefined || value === null) return "";
+  return String(value);
+}, z.string());
+const aiStringArray = z.preprocess((value) => {
+  if (value === undefined || value === null || value === "") return [];
+  if (Array.isArray(value)) return value.map((item) => String(item));
+  return [String(value)];
+}, z.array(z.string()));
+const scoreValue = z.preprocess((value) => {
+  if (value === undefined || value === null || value === "") return 0;
+  const numeric = typeof value === "number" ? value : Number(String(value).replace(",", "."));
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.max(0, Math.min(100, Math.round(numeric)));
+}, z.number().min(0).max(100));
 
 const confidenceValue = z.number().min(0).max(1);
 
@@ -48,28 +78,44 @@ export const aiLeadDraftSchema = z.object({
 export type AILeadDraft = z.infer<typeof aiLeadDraftSchema>;
 
 export const aiExtractedLeadSchema = z.object({
-  name: z.string(),
-  phone: z.string(),
-  city: z.string(),
-  neighborhood: z.string(),
-  source: z.string(),
-  project_type: z.string(),
-  interest_type: z.string(),
+  name: aiString.default(""),
+  phone: aiString.default(""),
+  city: aiString.default(""),
+  neighborhood: aiString.default(""),
+  source: aiString.default(""),
+  project_type: aiString.default(""),
+  interest_type: aiString.default(""),
   has_land: nullableBoolean,
   has_blueprint: nullableBoolean,
-  urgency: z.string(),
-  notes: z.string(),
-  status: z.string(),
-  priority: z.string(),
-  next_step: z.string(),
-  lead_score: z.number().min(0).max(100),
+  urgency: aiString.default(""),
+  notes: aiString.default(""),
+  status: aiString.default("Novo lead"),
+  priority: aiString.default("Media"),
+  next_step: aiString.default(""),
+  lead_score: scoreValue.default(0),
 });
 
-export const aiLeadAnalysisSchema = z.object({
+export const aiLeadAnalysisSchema = z.preprocess((value) => {
+  if (!value || typeof value !== "object") return value;
+
+  const record = value as Record<string, unknown>;
+  const leads = Array.isArray(record.leads)
+    ? record.leads
+    : record.lead && typeof record.lead === "object"
+      ? [record.lead]
+      : [];
+
+  return {
+    ...record,
+    leads,
+    summary: record.summary ?? record.ai_summary ?? "",
+    warnings: record.warnings ?? record.missing_information ?? [],
+  };
+}, z.object({
   leads: z.array(aiExtractedLeadSchema),
-  summary: z.string(),
-  warnings: z.array(z.string()),
-});
+  summary: aiString.default(""),
+  warnings: aiStringArray.default([]),
+}));
 
 export type AIExtractedLead = z.infer<typeof aiExtractedLeadSchema>;
 export type AILeadAnalysisResult = z.infer<typeof aiLeadAnalysisSchema>;

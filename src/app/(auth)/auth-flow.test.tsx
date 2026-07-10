@@ -2,7 +2,6 @@ import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-li
 import { afterEach, describe, expect, it, vi } from "vitest";
 import LoginPage from "@/app/(auth)/login/page";
 import RegisterPage from "@/app/(auth)/register/page";
-import { useCrmData } from "@/hooks/use-crm-data";
 
 const routerMocks = vi.hoisted(() => ({
   replace: vi.fn(),
@@ -34,6 +33,12 @@ vi.mock("@/lib/supabase/client", () => ({
     auth: supabaseMocks,
   },
 }));
+
+async function renderCrmHook() {
+  vi.resetModules();
+  const { useCrmData } = await import("@/hooks/use-crm-data");
+  return renderHook(() => useCrmData());
+}
 
 describe("auth flow", () => {
   afterEach(() => {
@@ -83,7 +88,7 @@ describe("auth flow", () => {
     supabaseMocks.getUser.mockResolvedValue({ data: { user: null }, error: null });
     supabaseMocks.signOut.mockResolvedValue({ error: null });
 
-    const { result } = renderHook(() => useCrmData());
+    const { result } = await renderCrmHook();
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     await act(async () => {

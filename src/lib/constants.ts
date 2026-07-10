@@ -18,13 +18,18 @@ export const leadStatuses = [
 
 export const pipelineStatuses = [
   "Novo lead",
+  "Aguardando resposta",
   "Em triagem",
   "Qualificado",
+  "Visita a marcar",
   "Visita marcada",
+  "Visita realizada",
+  "Orcamento a enviar",
   "Orcamento enviado",
   "Em negociacao",
   "Fechado",
   "Perdido",
+  "Sem resposta",
 ] as const satisfies readonly LeadStatus[];
 
 export const leadSources = [

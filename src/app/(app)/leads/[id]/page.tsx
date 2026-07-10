@@ -354,7 +354,7 @@ function ScheduleVisitDialog({
 function LeadHeader({ lead, onEdit }: { lead: Lead; onEdit: () => void }) {
   const location = [lead.city, lead.neighborhood].filter(Boolean).join(" / ") || "Local a confirmar";
   return (
-    <Card className="overflow-hidden border-primary/10 shadow-lg">
+    <Card className="overflow-hidden border-primary/10 shadow-lg shadow-primary/10">
       <div className="relative overflow-hidden bg-primary p-5 text-primary-foreground sm:p-6">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(185,120,56,0.24),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.08),transparent_42%)]" />
         <div className="relative">
@@ -365,7 +365,7 @@ function LeadHeader({ lead, onEdit }: { lead: Lead; onEdit: () => void }) {
               <span>-</span>
               <span>{location}</span>
             </div>
-            <h1 className="mt-2 text-3xl font-semibold tracking-normal">{lead.name}</h1>
+            <h1 className="mt-2 text-3xl font-semibold tracking-normal sm:text-4xl">{lead.name}</h1>
             <p className="mt-2 text-sm text-white/72">{lead.phone}</p>
             <div className="mt-4 flex flex-wrap gap-2">
               <LeadStatusBadge status={lead.status} />
@@ -391,7 +391,7 @@ function LeadHeader({ lead, onEdit }: { lead: Lead; onEdit: () => void }) {
                   Ligar
                 </a>
               </Button>
-              <Button variant="outline" size="lg" onClick={onEdit}>
+              <Button variant="outline" size="lg" onClick={onEdit} className="border-white/20 bg-white/8 text-white hover:bg-white/14">
                 <Edit className="size-4" />
                 Editar
               </Button>
@@ -412,7 +412,7 @@ function LeadHeader({ lead, onEdit }: { lead: Lead; onEdit: () => void }) {
 
 function HeaderStat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="rounded-xl border bg-secondary/35 p-3 shadow-xs">
+    <div className="rounded-xl border bg-secondary/35 p-3 shadow-xs ring-1 ring-border/40">
       <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
       <div className="mt-1 text-sm font-medium">{value}</div>
     </div>
@@ -421,7 +421,7 @@ function HeaderStat({ label, value }: { label: string; value: React.ReactNode })
 
 function InfoCard({ title, icon: Icon, children }: { title: string; icon: typeof UserRound; children: React.ReactNode }) {
   return (
-    <Card className="h-full transition duration-200 hover:-translate-y-0.5 hover:shadow-lg">
+    <Card className="premium-hover h-full">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <span className="flex size-8 items-center justify-center rounded-lg bg-accent/12 text-accent">
@@ -441,7 +441,7 @@ function InfoGrid({ children }: { children: React.ReactNode }) {
 
 function Info({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="rounded-xl border bg-secondary/35 p-3 shadow-xs">
+    <div className="rounded-xl border bg-secondary/35 p-3 shadow-xs transition hover:bg-secondary/50">
       <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
       <div className="mt-1 text-sm font-medium">{value}</div>
     </div>
@@ -476,7 +476,7 @@ function QualificationChecklist({ lead, interactions }: { lead: Lead; interactio
       </CardHeader>
       <CardContent className="grid gap-2 sm:grid-cols-2">
         {items.map(([label, done]) => (
-          <div key={label} className={cn("flex items-center gap-3 rounded-xl border p-3 shadow-xs", done ? "border-emerald-200 bg-emerald-50/70 dark:bg-emerald-950/10" : "bg-card")}>
+          <div key={label} className={cn("flex items-center gap-3 rounded-xl border p-3 shadow-xs", done ? "border-emerald-200 bg-emerald-50/70 dark:border-emerald-900/60 dark:bg-emerald-950/18" : "bg-card")}>
             {done ? <CheckCircle2 className="size-4 text-emerald-600" /> : <XCircle className="size-4 text-muted-foreground" />}
             <span className="text-sm">{label}</span>
           </div>
@@ -736,12 +736,12 @@ function LeadTemplatePanel({
             </Select>
           </Field>
           {missingFields.length ? (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/28 dark:text-amber-100">
               Revise antes de enviar: faltam {missingFields.join(", ")} para preencher melhor esta mensagem.
             </div>
           ) : null}
           {!isValidWhatsAppPhone(lead.phone) ? (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs leading-5 text-red-800">Telefone incompleto ou invalido para WhatsApp.</div>
+            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs leading-5 text-red-800 dark:border-red-900/60 dark:bg-red-950/28 dark:text-red-100">Telefone incompleto ou invalido para WhatsApp.</div>
           ) : null}
           <label className="flex items-start gap-2 rounded-xl border bg-secondary/35 p-3 text-sm">
             <input type="checkbox" checked={registerInteraction} onChange={(event) => setRegisterInteraction(event.target.checked)} className="mt-1" />
@@ -1043,7 +1043,7 @@ function TaskGroup({
 function TaskRow({ task, onComplete }: { task: Task; onComplete: (id: string) => Promise<void> }) {
   const [saving, setSaving] = React.useState(false);
   return (
-    <div className={cn("rounded-md border p-3", isTaskOverdue(task) && "border-red-200 bg-red-50/50 dark:bg-red-950/10")}>
+    <div className={cn("rounded-md border p-3", isTaskOverdue(task) && "border-red-200 bg-red-50/50 dark:border-red-900/60 dark:bg-red-950/18")}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">

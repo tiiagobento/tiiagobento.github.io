@@ -119,18 +119,30 @@ Campos tambem aceitos em portugues: `nome`, `telefone`, `origem`, `prioridade`, 
 7. Use `/templates` para copiar mensagens ou abrir WhatsApp com texto pronto.
 8. Acompanhe leads parados, visitas, follow-ups e tarefas atrasadas no dashboard.
 
-## IA com Puter.js
+## IA configuravel
 
 A rota `/leads/ai-import` permite colar conversa ou enviar prints para gerar rascunhos editaveis de leads.
 
-- Puter.js roda somente no client-side com `https://js.puter.com/v2/`.
-- Nao existe chave Puter no `.env`.
-- A analise so acontece ao clicar em `Analisar com IA`.
-- A IA pode pedir login/autorizacao em uma janela do Puter.
+- O modo `IA via servidor` usa `/api/ai/extract-leads` e mantem a API key somente no backend.
+- O modo `Puter no navegador` continua disponivel separadamente com `https://js.puter.com/v2/`.
+- A analise acontece somente ao clicar em `Analisar com IA`.
+- `/api/ai/generate-message` gera mensagens estruturadas para integracoes futuras do CRM.
 - A IA nao salva automaticamente: revise o rascunho e clique em `Salvar lead`.
-- Imagens sao convertidas para data URL e nao sao salvas no banco.
+- Imagens sao convertidas no navegador, enviadas ao servidor como `mimeType` + base64, e nao sao salvas no banco.
+- Gemini e Mock aceitam prints diretamente. Groq, OpenRouter e Hugging Face so aceitam imagem quando o modelo configurado for visual; caso contrario o app mostra um erro amigavel pedindo Gemini ou Puter.
 
-Para testar: crie/login com usuario real, acesse `/leads/ai-import`, cole uma conversa ou envie PNG/JPG/WEBP, analise, revise e salve. Depois confira o lead em `/leads`.
+Configure um provider em `.env.local`:
+
+```env
+AI_PROVIDER=gemini
+GEMINI_API_KEY=sua-chave-secreta
+```
+
+Valores aceitos em `AI_PROVIDER`: `gemini`, `groq`, `openrouter`, `huggingface` e `mock`. Use `mock` sem chave para desenvolvimento. Se o provider escolhido nao tiver chave, a API retorna uma mensagem amigavel e nao fica em loading infinito.
+
+As variaveis `GEMINI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY` e `HUGGINGFACE_API_KEY` nunca usam o prefixo `NEXT_PUBLIC` e nunca sao importadas em componentes client.
+
+Para testar: crie/login com usuario real, acesse `/leads/ai-import`, cole uma conversa ou envie ate 5 prints PNG/JPG/WEBP de ate 5 MB cada, analise, revise e salve. Depois confira o lead em `/leads`.
 
 ## Admin e parceiro Bruno
 
@@ -178,6 +190,8 @@ npm run lint
 npm run test
 npm run test:e2e
 npm run build
+npm run android:sync
+npm run android:debug
 ```
 
 No PowerShell do Windows, se `npm` for bloqueado por execution policy, use `npm.cmd run ...`.
@@ -188,3 +202,25 @@ No PowerShell do Windows, se `npm` for bloqueado por execution policy, use `npm.
 - Leads sem contato ha mais de 3 dias aparecem com alerta, exceto fechados ou perdidos.
 - Leads com `lead_score >= 70` aparecem como quentes.
 - O layout e responsivo, com sidebar no desktop e navegacao inferior no mobile.
+
+## PWA, offline e APK Android
+
+O CRM possui manifesto PWA, service worker, app shell cacheado e banco local com IndexedDB/Dexie. Online, o Supabase continua sendo a fonte real dos dados. Offline, o app mostra dados ja sincronizados, permite operacoes basicas e cria uma fila local para sincronizar quando a conexao voltar.
+
+Documentacao:
+
+- `docs/OFFLINE_MODE.md`
+- `docs/ANDROID_APK.md`
+
+APK debug:
+
+```bash
+npm run android:sync
+npm run android:debug
+```
+
+Caminho esperado:
+
+```text
+android/app/build/outputs/apk/debug/app-debug.apk
+```

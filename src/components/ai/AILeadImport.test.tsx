@@ -7,14 +7,21 @@ const routerMocks = vi.hoisted(() => ({
 }));
 
 const crmMocks = vi.hoisted(() => ({
+  leads: [],
   saveLead: vi.fn(),
+  updateLead: vi.fn(),
 }));
 
 const aiMocks = vi.hoisted(() => ({
   analyzeLeadWithPuter: vi.fn(),
   ensurePuterAuthorizedFromUserAction: vi.fn(),
   isPuterReady: vi.fn(() => true),
+  analyzeLeadWithServer: vi.fn(),
+}));
+
+const imageMocks = vi.hoisted(() => ({
   fileToDataUrl: vi.fn(),
+  maybeCompressImage: vi.fn(async (file: File) => file),
 }));
 
 const toastMocks = vi.hoisted(() => ({
@@ -42,8 +49,20 @@ vi.mock("@/hooks/use-crm-data", () => ({
 vi.mock("@/lib/ai/puter-client", () => ({
   analyzeLeadWithPuter: aiMocks.analyzeLeadWithPuter,
   ensurePuterAuthorizedFromUserAction: aiMocks.ensurePuterAuthorizedFromUserAction,
-  fileToDataUrl: aiMocks.fileToDataUrl,
   isPuterReady: aiMocks.isPuterReady,
+}));
+
+vi.mock("@/lib/ai/image-utils", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/ai/image-utils")>();
+  return {
+    ...actual,
+    fileToDataUrl: imageMocks.fileToDataUrl,
+    maybeCompressImage: imageMocks.maybeCompressImage,
+  };
+});
+
+vi.mock("@/lib/ai/server-client", () => ({
+  analyzeLeadWithServer: aiMocks.analyzeLeadWithServer,
 }));
 
 const analysisResult = {
@@ -95,7 +114,7 @@ describe("AILeadImport", () => {
     fireEvent.change(screen.getByPlaceholderText(/cole aqui a conversa/i), { target: { value: "Olá, quero orçamento em Biguaçu" } });
     fireEvent.click(screen.getByRole("button", { name: /analisar com ia/i }));
 
-    expect(await screen.findByText("Analisando com IA...")).toBeInTheDocument();
+    expect(await screen.findByText("Analisando via Puter...")).toBeInTheDocument();
     resolveAnalysis(analysisResult);
     await screen.findByText("Lead quente para visita.");
   });
@@ -113,8 +132,36 @@ describe("AILeadImport", () => {
     expect(screen.getByText("Telefone precisa ser revisado.")).toBeInTheDocument();
   });
 
+  it("uses the server provider by default when it is configured", async () => {
+    aiMocks.analyzeLeadWithServer.mockResolvedValue(analysisResult);
+
+    render(<AILeadImport serverAIConfigured serverProvider="gemini" />);
+    expect(screen.getByText("Servidor: Gemini")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText(/cole aqui a conversa/i), { target: { value: "Quero construir em Biguacu." } });
+    fireEvent.click(screen.getByRole("button", { name: /analisar com ia/i }));
+
+    expect(await screen.findByText("Lead quente para visita.")).toBeInTheDocument();
+    expect(aiMocks.analyzeLeadWithServer).toHaveBeenCalledWith(expect.objectContaining({
+      conversation: "Quero construir em Biguacu.",
+      source: "WhatsApp",
+    }));
+    expect(aiMocks.ensurePuterAuthorizedFromUserAction).not.toHaveBeenCalled();
+  });
+
+  it("shows a friendly server configuration error without hanging", async () => {
+    aiMocks.analyzeLeadWithServer.mockRejectedValue(new Error("IA não configurada. Configure uma API key nas variáveis de ambiente."));
+
+    render(<AILeadImport serverAIConfigured serverProvider="groq" />);
+    fireEvent.change(screen.getByPlaceholderText(/cole aqui a conversa/i), { target: { value: "Cliente pediu orçamento." } });
+    fireEvent.click(screen.getByRole("button", { name: /analisar com ia/i }));
+
+    expect(await screen.findByText("IA não configurada. Configure uma API key nas variáveis de ambiente.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /analisar com ia/i })).toBeEnabled();
+  });
+
   it("loads image preview and sends data URL to analysis", async () => {
-    aiMocks.fileToDataUrl.mockResolvedValue("data:image/png;base64,abc");
+    imageMocks.fileToDataUrl.mockResolvedValue("data:image/png;base64,abc");
     aiMocks.analyzeLeadWithPuter.mockResolvedValue(analysisResult);
 
     render(<AILeadImport />);
@@ -132,6 +179,52 @@ describe("AILeadImport", () => {
         }),
       ),
     );
+  });
+
+  it("blocks invalid image files", async () => {
+    render(<AILeadImport />);
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(["pdf"], "contrato.pdf", { type: "application/pdf" });
+
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => expect(toastMocks.error).toHaveBeenCalledWith("Envie apenas imagens PNG, JPG, JPEG ou WEBP."));
+    expect(imageMocks.fileToDataUrl).not.toHaveBeenCalled();
+  });
+
+  it("sends typed image payload to server AI", async () => {
+    imageMocks.fileToDataUrl.mockResolvedValue("data:image/jpeg;base64,abc");
+    aiMocks.analyzeLeadWithServer.mockResolvedValue(analysisResult);
+
+    render(<AILeadImport serverAIConfigured serverProvider="gemini" />);
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(["image"], "print.jpg", { type: "image/jpeg" });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    expect(await screen.findByAltText("Preview print.jpg")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /analisar com ia/i }));
+
+    await waitFor(() =>
+      expect(aiMocks.analyzeLeadWithServer).toHaveBeenCalledWith(
+        expect.objectContaining({
+          images: [{ mimeType: "image/jpeg", data: "abc" }],
+        }),
+      ),
+    );
+  });
+
+  it("removes selected image before analysis", async () => {
+    imageMocks.fileToDataUrl.mockResolvedValue("data:image/png;base64,abc");
+
+    render(<AILeadImport />);
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(["image"], "print.png", { type: "image/png" });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    expect(await screen.findByAltText("Preview print.png")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /remover imagem/i }));
+
+    expect(screen.queryByAltText("Preview print.png")).not.toBeInTheDocument();
   });
 
   it("saves reviewed AI lead through CRM data hook", async () => {

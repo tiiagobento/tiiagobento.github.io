@@ -14,7 +14,7 @@ export default function LeadsPage() {
   if (loading) return <LoadingSkeleton />;
   return (
     <div className="space-y-5">
-      <Card className="overflow-hidden border-primary/10 bg-primary text-primary-foreground shadow-lg">
+      <Card className="page-hero">
         <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
         <div>
           <h1 className="text-2xl font-semibold">Leads</h1>

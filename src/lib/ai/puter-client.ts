@@ -1,5 +1,6 @@
 import { buildPuterLeadPrompt } from "@/lib/ai/puter-lead-prompt";
 import { parseAILeadAnalysisResponse } from "@/lib/ai/parse-ai-json";
+export { fileToDataUrl } from "@/lib/ai/image-utils";
 import type { AIExtractedLead, AILeadAnalysisResult } from "@/lib/validations/ai-lead-draft";
 
 const DEFAULT_MODEL = "gpt-5.4-nano";
@@ -126,21 +127,6 @@ export async function analyzeLeadWithPuter({ conversation, source, images = [], 
   }
 
   return mergeAnalysisResults(results);
-}
-
-export function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        resolve(reader.result);
-        return;
-      }
-      reject(new Error("Nao foi possivel ler essa imagem."));
-    };
-    reader.onerror = () => reject(new Error("Nao foi possivel ler essa imagem."));
-    reader.readAsDataURL(file);
-  });
 }
 
 function mergeAnalysisResults(results: AILeadAnalysisResult[]): AILeadAnalysisResult {

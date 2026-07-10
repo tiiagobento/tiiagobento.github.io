@@ -96,19 +96,42 @@ export function DashboardView({ leads, interactions, tasks }: { leads: Lead[]; i
 
   return (
     <div className="space-y-5">
+      <section className="overflow-hidden rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/10">
+        <div className="relative p-5 sm:p-6">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(184,117,53,0.22),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.08),transparent_46%)]" />
+          <div className="relative flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/55">Painel comercial</p>
+              <h1 className="mt-2 text-2xl font-semibold sm:text-3xl">Priorize visitas, orcamentos e retomadas com dados reais.</h1>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-white/70">
+                Acompanhe leads quentes, tarefas atrasadas e oportunidades por etapa para decidir o proximo contato sem depender de planilhas.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap xl:justify-end">
+              <Button asChild variant="accent">
+                <Link href="/leads/new">
+                  <Plus className="size-4" />
+                  Novo lead
+                </Link>
+              </Button>
+              <Button asChild variant="secondary">
+                <Link href="/leads/ai-import">
+                  <Sparkles className="size-4" />
+                  Importar com IA
+                </Link>
+              </Button>
+              <Button asChild variant="outline" className="border-white/20 bg-white/8 text-white hover:bg-white/14">
+                <Link href="/pipeline">
+                  <ListChecks className="size-4" />
+                  Pipeline
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="flex flex-col gap-2 rounded-xl border bg-card/90 p-3 shadow-sm sm:flex-row sm:flex-wrap sm:items-center">
-        <Button asChild>
-          <Link href="/leads/new">
-            <Plus className="size-4" />
-            Novo lead
-          </Link>
-        </Button>
-        <Button asChild variant="accent">
-          <Link href="/leads/ai-import">
-            <Sparkles className="size-4" />
-            Importar com IA
-          </Link>
-        </Button>
         <Button asChild variant="outline">
           <Link href="/leads?score=hot">
             <Flame className="size-4" />
@@ -119,12 +142,6 @@ export function DashboardView({ leads, interactions, tasks }: { leads: Lead[]; i
           <Link href="/tasks?status=atrasada">
             <AlertTriangle className="size-4" />
             Tarefas atrasadas
-          </Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/pipeline">
-            <ListChecks className="size-4" />
-            Abrir pipeline
           </Link>
         </Button>
       </section>
@@ -378,8 +395,8 @@ function ActionList({
                 <span
                   className={cn(
                     "shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold shadow-xs",
-                    item.tone === "danger" && "bg-red-50 text-red-700 ring-1 ring-red-100",
-                    item.tone === "hot" && "bg-amber-50 text-amber-800 ring-1 ring-amber-100",
+                    item.tone === "danger" && "bg-red-50 text-red-700 ring-1 ring-red-100 dark:bg-red-950/35 dark:text-red-200 dark:ring-red-900/50",
+                    item.tone === "hot" && "bg-amber-50 text-amber-800 ring-1 ring-amber-100 dark:bg-amber-950/35 dark:text-amber-200 dark:ring-amber-900/50",
                     (!item.tone || item.tone === "default") && "bg-background text-muted-foreground ring-1 ring-border",
                   )}
                 >
@@ -435,7 +452,7 @@ function LeadList({
                 </div>
                 <div className="shrink-0 text-right">
                   {showScore ? <LeadScoreBadge score={lead.lead_score} /> : null}
-                  {showStale ? <span className="rounded-full bg-red-50 px-2 py-1 text-xs font-medium text-red-700">{daysSinceLastContact(lead)}d</span> : null}
+                  {showStale ? <span className="rounded-full bg-red-50 px-2 py-1 text-xs font-medium text-red-700 dark:bg-red-950/35 dark:text-red-200 dark:ring-1 dark:ring-red-900/50">{daysSinceLastContact(lead)}d</span> : null}
                   {!showScore && !showStale ? <span className="text-xs text-muted-foreground">{format(parseISO(lead.created_at), "dd/MM", { locale: ptBR })}</span> : null}
                 </div>
               </Link>

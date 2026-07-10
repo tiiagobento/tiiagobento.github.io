@@ -4,6 +4,10 @@ import * as React from "react";
 import { toast } from "sonner";
 import { addHours } from "date-fns";
 import { buildFollowUpTaskFromInteraction, normalizeLead, normalizeTask } from "@/lib/crm-records";
+import { clearOfflineDbForUser } from "@/lib/offline/db";
+import { useNetworkStatus } from "@/lib/offline/network-status";
+import { loadCrmSnapshot, putLocalRecord, saveCrmSnapshot } from "@/lib/offline/offline-store";
+import { enqueueOperation, getSyncSummary, retryFailedOperations, syncPendingOperations, type SyncSummary } from "@/lib/offline/sync-queue";
 import { interactionSchema } from "@/lib/schemas";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase/client";
 import type { Interaction, Lead, MessageTemplate, Profile, Task } from "@/lib/types";
@@ -32,8 +36,61 @@ export function useCrmData() {
   const [state, setState] = React.useState<CrmState>({ leads: [], interactions: [], tasks: [], templates: [], profiles: [] });
   const [loading, setLoading] = React.useState(true);
   const [userEmail, setUserEmail] = React.useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = React.useState<string | null>(null);
   const [currentProfile, setCurrentProfile] = React.useState<Profile | null>(null);
   const [configurationError, setConfigurationError] = React.useState<string | null>(null);
+  const [syncSummary, setSyncSummary] = React.useState<SyncSummary>({ pending: 0, failed: 0, conflict: 0, operations: [] });
+  const [syncing, setSyncing] = React.useState(false);
+  const network = useNetworkStatus();
+
+  const refreshSyncSummary = React.useCallback(async (userId = currentUserId) => {
+    setSyncSummary(await getSyncSummary(userId));
+  }, [currentUserId]);
+
+  async function getCachedUser() {
+    if (!isSupabaseConfigured || !supabase) return null;
+    const { data } = await supabase.auth.getSession();
+    return data.session?.user ?? null;
+  }
+
+  async function getUserIdForWrite() {
+    if (currentUserId) return currentUserId;
+    const user = await getCachedUser();
+    if (user?.id) return user.id;
+    throw new Error(network.online ? "Usuario nao autenticado" : "Voce esta offline. Conecte-se a internet para renovar sua sessao.");
+  }
+
+  const loadOfflineSnapshot = React.useCallback(async (userId: string, message = "Voce esta offline. Mostrando dados sincronizados neste dispositivo.") => {
+    const snapshot = await loadCrmSnapshot(userId);
+    if (!snapshot) throw new Error("Voce esta offline e ainda nao ha dados sincronizados neste dispositivo.");
+    setState(snapshot);
+    setConfigurationError(message);
+    await refreshSyncSummary(userId);
+    toast.info(message);
+  }, [refreshSyncSummary]);
+
+  function updateLocalState(updater: (current: CrmState) => CrmState) {
+    setState((current) => updater(current));
+  }
+
+  async function queueOfflineChange({
+    entity,
+    entityId,
+    userId,
+    operation,
+    data,
+  }: {
+    entity: "leads" | "tasks" | "interactions" | "message_templates";
+    entityId: string;
+    userId: string;
+    operation: "create" | "update" | "delete";
+    data: unknown;
+  }) {
+    await enqueueOperation({ entity, entityId, userId, operation, data });
+    await putLocalRecord(entity, data as { id: string; user_id?: string | null }, userId, operation);
+    await refreshSyncSummary(userId);
+    toast.info("Voce esta offline. Essa acao sera sincronizada quando a conexao voltar.");
+  }
 
   const refresh = React.useCallback(async () => {
     setLoading(true);
@@ -42,9 +99,18 @@ export function useCrmData() {
         throw new Error("Supabase nao configurado. Preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.");
       }
 
+      const cachedUser = await getCachedUser();
+      if (!network.online && cachedUser?.id) {
+        setCurrentUserId(cachedUser.id);
+        setUserEmail(cachedUser.email ?? null);
+        await loadOfflineSnapshot(cachedUser.id);
+        return;
+      }
+
       const { data: userData, error: userError } = await supabase.auth.getUser();
       if (userError) throw userError;
       setUserEmail(userData.user?.email ?? null);
+      setCurrentUserId(userData.user?.id ?? null);
 
       if (!userData.user) {
         setCurrentProfile(null);
@@ -75,16 +141,29 @@ export function useCrmData() {
       if (templatesError) throw templatesError;
       if (profilesError && ownProfile?.role === "admin") throw profilesError;
 
-      setConfigurationError(null);
-      setState({
+      const nextState = {
         leads: (leads ?? []) as Lead[],
         interactions: (interactions ?? []) as Interaction[],
         tasks: (tasks ?? []) as Task[],
         templates: (templates ?? []) as MessageTemplate[],
         profiles: (profiles ?? []) as Profile[],
-      });
+      };
+
+      setConfigurationError(null);
+      setState(nextState);
+      await saveCrmSnapshot(userData.user.id, nextState);
+      await refreshSyncSummary(userData.user.id);
     } catch (error) {
       console.error(error);
+      const cachedUser = await getCachedUser();
+      if (cachedUser?.id) {
+        try {
+          await loadOfflineSnapshot(cachedUser.id);
+          return;
+        } catch {
+          // Continue with the original error if no offline snapshot exists.
+        }
+      }
       const message = error instanceof Error ? error.message : "Nao foi possivel carregar os dados do Supabase.";
       setConfigurationError(message);
       toast.error(message);
@@ -92,26 +171,88 @@ export function useCrmData() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadOfflineSnapshot, network.online, refreshSyncSummary]);
 
   React.useEffect(() => {
     void refresh();
   }, [refresh]);
 
+  React.useEffect(() => {
+    async function syncWhenOnline() {
+      if (!network.online || !currentUserId || syncing) return;
+      setSyncing(true);
+      try {
+        const result = await syncPendingOperations(currentUserId);
+        if (result.synced > 0) {
+          toast.success(`${result.synced} alteracao(oes) sincronizada(s).`);
+          await refresh();
+        } else {
+          await refreshSyncSummary(currentUserId);
+        }
+        if (result.failed > 0) toast.error("Algumas alteracoes nao sincronizaram.");
+      } finally {
+        setSyncing(false);
+      }
+    }
+
+    void syncWhenOnline();
+  }, [currentUserId, network.online, refresh, refreshSyncSummary, syncing]);
+
+  React.useEffect(() => {
+    function updateQueue() {
+      void refreshSyncSummary();
+    }
+
+    window.addEventListener("novaforma:sync-queue-changed", updateQueue);
+    return () => window.removeEventListener("novaforma:sync-queue-changed", updateQueue);
+  }, [refreshSyncSummary]);
+
+  async function syncNow() {
+    if (!currentUserId) throw new Error("Usuario nao autenticado.");
+    if (!network.online) {
+      toast.error("Voce esta offline. Conecte-se para sincronizar.");
+      return;
+    }
+    setSyncing(true);
+    try {
+      const result = await syncPendingOperations(currentUserId);
+      await refresh();
+      if (result.synced > 0) toast.success(`${result.synced} alteracao(oes) sincronizada(s).`);
+      if (result.failed > 0) toast.error("Algumas alteracoes nao sincronizaram.");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function retrySync() {
+    if (!currentUserId) return;
+    await retryFailedOperations(currentUserId);
+    await syncNow();
+  }
+
   async function saveLead(input: Partial<Lead> & Pick<Lead, "name" | "phone">) {
     const nextLead = normalizeLead(input);
+    const isUpdate = state.leads.some((lead) => lead.id === nextLead.id);
     try {
+      const userId = await getUserIdForWrite();
+      const leadWithUser = { ...nextLead, user_id: userId };
+      if (!network.online) {
+        updateLocalState((current) => ({
+          ...current,
+          leads: [leadWithUser, ...current.leads.filter((lead) => lead.id !== leadWithUser.id)],
+        }));
+        await queueOfflineChange({ entity: "leads", entityId: leadWithUser.id, userId, operation: isUpdate ? "update" : "create", data: leadWithUser });
+        return leadWithUser;
+      }
       if (!isSupabaseConfigured || !supabase) throw new Error("Supabase nao configurado.");
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      if (!userData.user) throw new Error("Usuario nao autenticado");
-      const payload = { ...nextLead, user_id: userData.user.id };
+      const payload = leadWithUser;
       const { data, error } = await supabase.from("leads").upsert(payload).select("*").single();
       if (error) throw error;
       toast.success("Lead salvo com sucesso.");
       await refresh();
       return data as Lead;
     } catch (error) {
+      if (!network.online) throw error;
       const message = getErrorMessage(error, "Erro ao salvar lead.");
       console.error("Erro ao salvar lead:", message, error);
       toast.error(message);
@@ -121,6 +262,13 @@ export function useCrmData() {
 
   async function deleteLead(id: string) {
     try {
+      const userId = await getUserIdForWrite();
+      const lead = state.leads.find((item) => item.id === id);
+      if (!network.online && lead) {
+        updateLocalState((current) => ({ ...current, leads: current.leads.filter((item) => item.id !== id) }));
+        await queueOfflineChange({ entity: "leads", entityId: id, userId, operation: "delete", data: lead });
+        return;
+      }
       if (!isSupabaseConfigured || !supabase) throw new Error("Supabase nao configurado.");
       const { error } = await supabase.from("leads").delete().eq("id", id);
       if (error) throw error;
@@ -154,17 +302,30 @@ export function useCrmData() {
       if (!lead) throw new Error("Lead valido nao encontrado para registrar interacao.");
       const parsed = interactionSchema.parse(input);
       const interaction: Interaction = { ...parsed, id: uuid(), lead_id: leadId, created_at: now };
+      const userId = await getUserIdForWrite();
+      const interactionWithUser = { ...interaction, user_id: userId };
+      const task = buildFollowUpTaskFromInteraction({ lead, leadId, interaction: parsed });
+      const updatedLead = { ...lead, last_contact_at: now, next_action_at: parsed.next_contact_at ?? lead.next_action_at, updated_at: now };
+
+      if (!network.online) {
+        updateLocalState((current) => ({
+          ...current,
+          interactions: [interactionWithUser, ...current.interactions],
+          tasks: task ? [{ ...task, user_id: userId }, ...current.tasks] : current.tasks,
+          leads: current.leads.map((item) => (item.id === leadId ? updatedLead : item)),
+        }));
+        await queueOfflineChange({ entity: "interactions", entityId: interaction.id, userId, operation: "create", data: interactionWithUser });
+        await queueOfflineChange({ entity: "leads", entityId: leadId, userId, operation: "update", data: updatedLead });
+        if (task) await queueOfflineChange({ entity: "tasks", entityId: task.id, userId, operation: "create", data: { ...task, user_id: userId } });
+        return;
+      }
+
       if (!isSupabaseConfigured || !supabase) throw new Error("Supabase nao configurado.");
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      if (!userData.user) throw new Error("Usuario nao autenticado");
-      const payload = { ...interaction, user_id: userData.user.id };
-      const { error } = await supabase.from("interactions").insert(payload);
+      const { error } = await supabase.from("interactions").insert(interactionWithUser);
       if (error) throw error;
 
-      const task = buildFollowUpTaskFromInteraction({ lead, leadId, interaction: parsed });
       if (task) {
-        const { error: taskError } = await supabase.from("tasks").insert({ ...task, user_id: userData.user.id });
+        const { error: taskError } = await supabase.from("tasks").insert({ ...task, user_id: userId });
         if (taskError) throw taskError;
       }
 
@@ -190,17 +351,26 @@ export function useCrmData() {
       const lead = state.leads.find((item) => item.id === existing.lead_id);
       if (!lead) throw new Error("Lead valido nao encontrado para atualizar interacao.");
       const parsed = interactionSchema.parse(input);
+      const userId = await getUserIdForWrite();
+      const updatedInteraction = { ...existing, ...parsed, user_id: existing.user_id ?? userId };
+
+      if (!network.online) {
+        updateLocalState((current) => ({
+          ...current,
+          interactions: current.interactions.map((item) => (item.id === id ? updatedInteraction : item)),
+        }));
+        await queueOfflineChange({ entity: "interactions", entityId: id, userId, operation: "update", data: updatedInteraction });
+        return;
+      }
+
       if (!isSupabaseConfigured || !supabase) throw new Error("Supabase nao configurado.");
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      if (!userData.user) throw new Error("Usuario nao autenticado");
 
       const { error } = await supabase.from("interactions").update(parsed).eq("id", id);
       if (error) throw error;
 
       const task = parsed.next_contact_at && !existing.next_contact_at ? buildFollowUpTaskFromInteraction({ lead, leadId: existing.lead_id, interaction: parsed }) : null;
       if (task) {
-        const { error: taskError } = await supabase.from("tasks").insert({ ...task, user_id: userData.user.id });
+        const { error: taskError } = await supabase.from("tasks").insert({ ...task, user_id: userId });
         if (taskError) throw taskError;
       }
 
@@ -215,6 +385,13 @@ export function useCrmData() {
 
   async function deleteInteraction(id: string) {
     try {
+      const userId = await getUserIdForWrite();
+      const existing = state.interactions.find((item) => item.id === id);
+      if (!network.online && existing) {
+        updateLocalState((current) => ({ ...current, interactions: current.interactions.filter((item) => item.id !== id) }));
+        await queueOfflineChange({ entity: "interactions", entityId: id, userId, operation: "delete", data: existing });
+        return;
+      }
       if (!isSupabaseConfigured || !supabase) throw new Error("Supabase nao configurado.");
       const { error } = await supabase.from("interactions").delete().eq("id", id);
       if (error) throw error;
@@ -230,11 +407,19 @@ export function useCrmData() {
   async function saveTask(input: Partial<Task> & Pick<Task, "title" | "due_date" | "priority" | "status">) {
     const task = normalizeTask(input);
     try {
+      const userId = await getUserIdForWrite();
+      const taskWithUser = { ...task, user_id: userId };
+      const isUpdate = state.tasks.some((item) => item.id === task.id);
+      if (!network.online) {
+        updateLocalState((current) => ({
+          ...current,
+          tasks: [taskWithUser, ...current.tasks.filter((item) => item.id !== task.id)],
+        }));
+        await queueOfflineChange({ entity: "tasks", entityId: task.id, userId, operation: isUpdate ? "update" : "create", data: taskWithUser });
+        return;
+      }
       if (!isSupabaseConfigured || !supabase) throw new Error("Supabase nao configurado.");
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      if (!userData.user) throw new Error("Usuario nao autenticado");
-      const { error } = await supabase.from("tasks").upsert({ ...task, user_id: userData.user.id });
+      const { error } = await supabase.from("tasks").upsert(taskWithUser);
       if (error) throw error;
       await refresh();
       toast.success("Tarefa salva.");
@@ -248,12 +433,17 @@ export function useCrmData() {
   async function saveTasks(inputs: Array<Partial<Task> & Pick<Task, "title" | "due_date" | "priority" | "status">>) {
     const tasks = inputs.map(normalizeTask);
     try {
+      const userId = await getUserIdForWrite();
+      const tasksWithUser = tasks.map((task) => ({ ...task, user_id: userId }));
+      if (!network.online) {
+        updateLocalState((current) => ({ ...current, tasks: [...tasksWithUser, ...current.tasks] }));
+        for (const task of tasksWithUser) {
+          await queueOfflineChange({ entity: "tasks", entityId: task.id, userId, operation: "create", data: task });
+        }
+        return;
+      }
       if (!isSupabaseConfigured || !supabase) throw new Error("Supabase nao configurado.");
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      if (!userData.user) throw new Error("Usuario nao autenticado");
-      const payload = tasks.map((task) => ({ ...task, user_id: userData.user.id }));
-      const { error } = await supabase.from("tasks").insert(payload);
+      const { error } = await supabase.from("tasks").insert(tasksWithUser);
       if (error) throw error;
       await refresh();
       toast.success(`${tasks.length} acoes criadas.`);
@@ -272,6 +462,13 @@ export function useCrmData() {
 
   async function deleteTask(id: string) {
     try {
+      const userId = await getUserIdForWrite();
+      const task = state.tasks.find((item) => item.id === id);
+      if (!network.online && task) {
+        updateLocalState((current) => ({ ...current, tasks: current.tasks.filter((item) => item.id !== id) }));
+        await queueOfflineChange({ entity: "tasks", entityId: id, userId, operation: "delete", data: task });
+        return;
+      }
       if (!isSupabaseConfigured || !supabase) throw new Error("Supabase nao configurado.");
       const { error } = await supabase.from("tasks").delete().eq("id", id);
       if (error) throw error;
@@ -295,11 +492,19 @@ export function useCrmData() {
       updated_at: now,
     };
     try {
+      const userId = await getUserIdForWrite();
+      const templateWithUser = { ...template, user_id: userId };
+      const isUpdate = state.templates.some((item) => item.id === template.id);
+      if (!network.online) {
+        updateLocalState((current) => ({
+          ...current,
+          templates: [templateWithUser, ...current.templates.filter((item) => item.id !== template.id)],
+        }));
+        await queueOfflineChange({ entity: "message_templates", entityId: template.id, userId, operation: isUpdate ? "update" : "create", data: templateWithUser });
+        return;
+      }
       if (!isSupabaseConfigured || !supabase) throw new Error("Supabase nao configurado.");
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      if (!userData.user) throw new Error("Usuario nao autenticado");
-      const { error } = await supabase.from("message_templates").upsert({ ...template, user_id: userData.user.id });
+      const { error } = await supabase.from("message_templates").upsert(templateWithUser);
       if (error) throw error;
       await refresh();
       toast.success("Template salvo.");
@@ -311,6 +516,13 @@ export function useCrmData() {
 
   async function deleteTemplate(id: string) {
     try {
+      const userId = await getUserIdForWrite();
+      const template = state.templates.find((item) => item.id === id);
+      if (!network.online && template) {
+        updateLocalState((current) => ({ ...current, templates: current.templates.filter((item) => item.id !== id) }));
+        await queueOfflineChange({ entity: "message_templates", entityId: id, userId, operation: "delete", data: template });
+        return;
+      }
       if (!isSupabaseConfigured || !supabase) throw new Error("Supabase nao configurado.");
       const { error } = await supabase.from("message_templates").delete().eq("id", id);
       if (error) throw error;
@@ -323,12 +535,16 @@ export function useCrmData() {
   }
 
   async function signOut() {
+    const userId = currentUserId;
     if (isSupabaseConfigured && supabase) {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
     }
+    if (userId) await clearOfflineDbForUser(userId);
     setUserEmail(null);
+    setCurrentUserId(null);
     setCurrentProfile(null);
+    setSyncSummary({ pending: 0, failed: 0, conflict: 0, operations: [] });
     setState({ leads: [], interactions: [], tasks: [], templates: [], profiles: [] });
     toast.success("Sessao encerrada.");
   }
@@ -338,6 +554,14 @@ export function useCrmData() {
     input: Pick<Lead, "visit_status" | "partner_notes" | "partner_visit_feedback">,
   ) {
     try {
+      const userId = await getUserIdForWrite();
+      const lead = state.leads.find((item) => item.id === leadId);
+      const updatedLead = lead ? { ...lead, ...input, updated_at: new Date().toISOString() } : null;
+      if (!network.online && updatedLead) {
+        updateLocalState((current) => ({ ...current, leads: current.leads.map((item) => (item.id === leadId ? updatedLead : item)) }));
+        await queueOfflineChange({ entity: "leads", entityId: leadId, userId, operation: "update", data: updatedLead });
+        return;
+      }
       if (!isSupabaseConfigured || !supabase) throw new Error("Supabase nao configurado.");
       const { error } = await supabase.rpc("partner_update_visit_feedback", {
         target_lead_id: leadId,
@@ -380,7 +604,13 @@ export function useCrmData() {
     loading,
     userEmail,
     currentProfile,
+    currentUserId,
     configurationError,
+    isOnline: network.online,
+    syncing,
+    syncSummary,
+    syncNow,
+    retrySync,
     refresh,
     saveLead,
     deleteLead,

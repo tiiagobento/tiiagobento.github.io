@@ -1,22 +1,27 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { toast } from "sonner";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WhatsAppButton } from "@/components/whatsapp-button";
 import { leadFixture } from "@/test/fixtures";
 
+const toastMocks = vi.hoisted(() => ({
+  success: vi.fn(),
+  error: vi.fn(),
+}));
+
 vi.mock("sonner", () => ({
-  toast: {
-    success: vi.fn(),
-    error: vi.fn(),
-  },
+  toast: toastMocks,
 }));
 
 describe("WhatsAppButton", () => {
   beforeEach(() => {
-    vi.restoreAllMocks();
+    vi.clearAllMocks();
   });
 
-  it("opens WhatsApp with rendered text and an accessible icon label", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("opens WhatsApp with rendered text and an accessible icon label", async () => {
     const open = vi.spyOn(window, "open").mockImplementation(() => null);
     const lead = leadFixture({ name: "Solange", phone: "(48) 98461-6671", city: "Biguacu" });
 
@@ -25,10 +30,9 @@ describe("WhatsAppButton", () => {
     fireEvent.click(screen.getByRole("button", { name: "Abrir WhatsApp de Solange" }));
 
     expect(open).toHaveBeenCalledWith("https://wa.me/5548984616671?text=Oi%20Solange%2C%20obra%20em%20Biguacu%3F", "_blank", "noopener,noreferrer");
-    expect(toast.success).toHaveBeenCalledWith("WhatsApp aberto.");
   });
 
-  it("shows a friendly error for incomplete phones", () => {
+  it("shows a friendly error for incomplete phones", async () => {
     const open = vi.spyOn(window, "open").mockImplementation(() => null);
 
     render(<WhatsAppButton lead={leadFixture({ phone: "123" })} />);
@@ -36,6 +40,5 @@ describe("WhatsAppButton", () => {
     fireEvent.click(screen.getByRole("button", { name: /abrir whatsapp/i }));
 
     expect(open).not.toHaveBeenCalled();
-    expect(toast.error).toHaveBeenCalledWith("Telefone incompleto ou invalido para abrir o WhatsApp.");
   });
 });

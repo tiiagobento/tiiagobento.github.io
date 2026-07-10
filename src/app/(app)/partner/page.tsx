@@ -53,7 +53,7 @@ export default function PartnerPage() {
 
   return (
     <div className="space-y-5">
-      <Card className="overflow-hidden border-primary/10 bg-primary text-primary-foreground shadow-lg">
+      <Card className="page-hero">
         <CardContent className="flex flex-col gap-3 p-5 sm:p-6">
           <div className="flex size-11 items-center justify-center rounded-xl bg-white/10 text-accent">
             <UserRound className="size-5" />
@@ -103,7 +103,7 @@ export default function PartnerPage() {
 
 function Metric({ title, value, tone = "default" }: { title: string; value: number; tone?: "default" | "gold" | "success" | "danger" }) {
   return (
-    <Card className={cn("transition duration-200 hover:-translate-y-0.5 hover:shadow-lg", tone === "danger" && "border-red-200 bg-red-50/50", tone === "success" && "border-emerald-200 bg-emerald-50/50", tone === "gold" && "border-amber-200 bg-amber-50/60")}>
+    <Card className={cn("transition duration-200 hover:-translate-y-0.5 hover:shadow-lg", tone === "danger" && "border-red-200 bg-red-50/50 dark:border-red-900/60 dark:bg-red-950/18", tone === "success" && "border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/60 dark:bg-emerald-950/18", tone === "gold" && "border-amber-200 bg-amber-50/60 dark:border-amber-900/60 dark:bg-amber-950/18")}>
       <CardContent className="flex items-center justify-between p-4">
         <div>
           <p className="text-sm text-muted-foreground">{title}</p>
