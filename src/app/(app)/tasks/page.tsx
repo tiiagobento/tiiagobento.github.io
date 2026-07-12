@@ -282,7 +282,7 @@ function TaskMetric({ title, value, tone = "default" }: { title: string; value: 
           <p className="text-sm text-muted-foreground">{title}</p>
           <p className="mt-1 text-3xl font-semibold">{value}</p>
         </div>
-        <span className={cn("flex size-11 items-center justify-center rounded-xl bg-secondary text-muted-foreground", tone === "danger" && "bg-red-100 text-red-700", tone === "success" && "bg-emerald-100 text-emerald-700")}>
+        <span className={cn("flex size-11 items-center justify-center rounded-xl bg-secondary text-muted-foreground", tone === "danger" && "bg-red-100 text-red-700 dark:bg-red-950/35 dark:text-red-200", tone === "success" && "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/35 dark:text-emerald-200")}>
           <CalendarClock className="size-5" />
         </span>
       </CardContent>

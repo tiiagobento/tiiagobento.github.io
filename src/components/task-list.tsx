@@ -21,7 +21,7 @@ export function TaskList({ tasks, leads, onComplete }: { tasks: Task[]; leads: L
                 <div className="flex flex-wrap items-center gap-2">
                   <h3 className="font-semibold text-primary">{task.title}</h3>
                   <LeadPriorityBadge priority={task.priority} />
-                  {overdue ? <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Atrasada</span> : null}
+                  {overdue ? <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-950/35 dark:text-red-200 dark:ring-1 dark:ring-red-900/50">Atrasada</span> : null}
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">{task.description}</p>
                 <p className="mt-1 text-xs text-muted-foreground">

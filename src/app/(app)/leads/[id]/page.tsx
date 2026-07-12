@@ -477,7 +477,7 @@ function QualificationChecklist({ lead, interactions }: { lead: Lead; interactio
       <CardContent className="grid gap-2 sm:grid-cols-2">
         {items.map(([label, done]) => (
           <div key={label} className={cn("flex items-center gap-3 rounded-xl border p-3 shadow-xs", done ? "border-emerald-200 bg-emerald-50/70 dark:border-emerald-900/60 dark:bg-emerald-950/18" : "bg-card")}>
-            {done ? <CheckCircle2 className="size-4 text-emerald-600" /> : <XCircle className="size-4 text-muted-foreground" />}
+            {done ? <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-300" /> : <XCircle className="size-4 text-muted-foreground" />}
             <span className="text-sm">{label}</span>
           </div>
         ))}
