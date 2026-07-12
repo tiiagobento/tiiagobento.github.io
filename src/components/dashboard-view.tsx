@@ -107,20 +107,20 @@ export function DashboardView({ leads, interactions, tasks }: { leads: Lead[]; i
                 Acompanhe leads quentes, tarefas atrasadas e oportunidades por etapa para decidir o proximo contato sem depender de planilhas.
               </p>
             </div>
-            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap xl:justify-end">
-              <Button asChild variant="accent">
+            <div className="grid gap-2 sm:flex sm:flex-wrap xl:justify-end">
+              <Button asChild variant="accent" className="min-h-12 sm:min-h-10">
                 <Link href="/leads/new">
                   <Plus className="size-4" />
                   Novo lead
                 </Link>
               </Button>
-              <Button asChild variant="secondary">
+              <Button asChild variant="secondary" className="min-h-12 sm:min-h-10">
                 <Link href="/leads/ai-import">
                   <Sparkles className="size-4" />
                   Importar com IA
                 </Link>
               </Button>
-              <Button asChild variant="outline" className="border-white/20 bg-white/8 text-white hover:bg-white/14">
+              <Button asChild variant="outline" className="min-h-12 border-white/20 bg-white/8 text-white hover:bg-white/14 sm:min-h-10">
                 <Link href="/pipeline">
                   <ListChecks className="size-4" />
                   Pipeline
@@ -131,14 +131,14 @@ export function DashboardView({ leads, interactions, tasks }: { leads: Lead[]; i
         </div>
       </section>
 
-      <section className="flex flex-col gap-2 rounded-xl border bg-card/90 p-3 shadow-sm sm:flex-row sm:flex-wrap sm:items-center">
-        <Button asChild variant="outline">
+      <section className="grid gap-2 rounded-xl border bg-card/90 p-3 shadow-sm sm:flex sm:flex-wrap sm:items-center">
+        <Button asChild variant="outline" className="min-h-12 sm:min-h-10">
           <Link href="/leads?score=hot">
             <Flame className="size-4" />
             Ver leads quentes
           </Link>
         </Button>
-        <Button asChild variant="outline">
+        <Button asChild variant="outline" className="min-h-12 sm:min-h-10">
           <Link href="/tasks?status=atrasada">
             <AlertTriangle className="size-4" />
             Tarefas atrasadas
@@ -146,7 +146,7 @@ export function DashboardView({ leads, interactions, tasks }: { leads: Lead[]; i
         </Button>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-6">
         <MetricCard title="Total de leads" value={leads.length} icon={Users} />
         <MetricCard title="Leads quentes" value={hotLeads.length} icon={Flame} tone="gold" />
         <MetricCard title="Visitas marcadas" value={countStatus(leads, "Visita marcada")} icon={CalendarCheck} tone="green" />
@@ -166,7 +166,7 @@ export function DashboardView({ leads, interactions, tasks }: { leads: Lead[]; i
           </Button>
         </div>
         {showMoreMetrics ? (
-          <section className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+          <section className="mt-3 grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-6">
             <MetricCard title="Novos leads" value={countStatus(leads, "Novo lead")} icon={Flame} tone="gold" />
             <MetricCard title="Qualificados" value={countStatus(leads, "Qualificado")} icon={CheckCircle2} tone="green" />
             <MetricCard title="Em negociacao" value={countStatus(leads, "Em negociacao")} icon={Handshake} />
@@ -178,7 +178,7 @@ export function DashboardView({ leads, interactions, tasks }: { leads: Lead[]; i
         ) : null}
       </div>
 
-      <section className="grid gap-4 xl:grid-cols-3">
+      <section className="hidden gap-4 md:grid xl:grid-cols-3">
         <ChartCard title="Leads por origem" description="Canais que estao gerando oportunidades">
           <DonutChart data={bySource} />
         </ChartCard>
@@ -190,7 +190,7 @@ export function DashboardView({ leads, interactions, tasks }: { leads: Lead[]; i
         </ChartCard>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[1.1fr_.9fr]">
+      <section className="hidden gap-4 md:grid xl:grid-cols-[1.1fr_.9fr]">
         <ChartCard title="Funil comercial" description="Etapas principais da jornada">
           <ResponsiveContainer width="100%" height={300}>
             <FunnelChart margin={{ top: 12, right: 24, left: 24, bottom: 12 }}>
@@ -208,7 +208,8 @@ export function DashboardView({ leads, interactions, tasks }: { leads: Lead[]; i
         </ChartCard>
       </section>
 
-      <ChartCard title="Evolucao de leads por mes" description="Entrada de novas oportunidades ao longo do tempo">
+      <div className="hidden md:block">
+        <ChartCard title="Evolucao de leads por mes" description="Entrada de novas oportunidades ao longo do tempo">
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={byMonth} margin={{ top: 10, right: 16, left: -20, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e6e1d8" />
@@ -218,7 +219,8 @@ export function DashboardView({ leads, interactions, tasks }: { leads: Lead[]; i
             <Line type="monotone" dataKey="value" name="Leads" stroke="#b7793c" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
           </LineChart>
         </ResponsiveContainer>
-      </ChartCard>
+        </ChartCard>
+      </div>
 
       <section className="grid gap-4 xl:grid-cols-4">
         <ActionList

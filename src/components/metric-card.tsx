@@ -20,14 +20,14 @@ const tones = {
 export function MetricCard({ title, value, subtitle, icon: Icon, tone = "default" }: MetricCardProps) {
   return (
     <Card className="premium-hover group overflow-hidden">
-      <CardContent className="flex items-start justify-between gap-4 p-4 sm:p-5">
+      <CardContent className="flex min-h-28 items-start justify-between gap-3 p-3 sm:gap-4 sm:p-5">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-muted-foreground">{title}</p>
-          <p className="mt-2 truncate text-3xl font-semibold tracking-normal text-primary">{value}</p>
+          <p className="line-clamp-2 text-xs font-medium leading-snug text-muted-foreground sm:text-sm">{title}</p>
+          <p className="mt-2 truncate text-2xl font-semibold tracking-normal text-primary sm:text-3xl">{value}</p>
           {subtitle ? <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p> : null}
         </div>
-        <div className={cn("flex size-11 shrink-0 items-center justify-center rounded-xl ring-1 transition group-hover:scale-105", tones[tone])}>
-          <Icon className="size-5" />
+        <div className={cn("flex size-9 shrink-0 items-center justify-center rounded-xl ring-1 transition group-hover:scale-105 sm:size-11", tones[tone])}>
+          <Icon className="size-4 sm:size-5" />
         </div>
       </CardContent>
     </Card>

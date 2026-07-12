@@ -162,7 +162,7 @@ export default function TasksPage() {
         </CardContent>
       </Card>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <TaskMetric title="Hoje" value={todayTasks.length} />
         <TaskMetric title="Atrasadas" value={overdueTasks.length} tone={overdueTasks.length ? "danger" : "default"} />
         <TaskMetric title="Proximas" value={upcomingTasks.length} />
@@ -277,13 +277,13 @@ export default function TasksPage() {
 function TaskMetric({ title, value, tone = "default" }: { title: string; value: number; tone?: "default" | "danger" | "success" }) {
   return (
     <Card className={cn("transition duration-200 hover:-translate-y-0.5 hover:shadow-lg", tone === "danger" && "border-red-200 bg-red-50/50 dark:border-red-900/60 dark:bg-red-950/18", tone === "success" && "border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/60 dark:bg-emerald-950/18")}>
-      <CardContent className="flex items-center justify-between p-4">
+      <CardContent className="flex min-h-24 items-center justify-between gap-3 p-3 sm:p-4">
         <div>
-          <p className="text-sm text-muted-foreground">{title}</p>
-          <p className="mt-1 text-3xl font-semibold">{value}</p>
+          <p className="text-xs font-medium text-muted-foreground sm:text-sm">{title}</p>
+          <p className="mt-1 text-2xl font-semibold sm:text-3xl">{value}</p>
         </div>
-        <span className={cn("flex size-11 items-center justify-center rounded-xl bg-secondary text-muted-foreground", tone === "danger" && "bg-red-100 text-red-700 dark:bg-red-950/35 dark:text-red-200", tone === "success" && "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/35 dark:text-emerald-200")}>
-          <CalendarClock className="size-5" />
+        <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-xl bg-secondary text-muted-foreground sm:size-11", tone === "danger" && "bg-red-100 text-red-700 dark:bg-red-950/35 dark:text-red-200", tone === "success" && "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/35 dark:text-emerald-200")}>
+          <CalendarClock className="size-4 sm:size-5" />
         </span>
       </CardContent>
     </Card>
@@ -560,10 +560,10 @@ function TaskCard({
             <TaskMeta label="Responsavel" value={task.responsible || "Tiago"} />
           </div>
         </div>
-        <div className="flex flex-wrap gap-2 lg:justify-end">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap lg:justify-end">
           {lead ? (
             <>
-              <Button asChild variant="outline" size="sm">
+              <Button asChild variant="outline" size="sm" className="min-h-10">
                 <Link href={`/leads/${lead.id}`}>
                   <ExternalLink className="size-4" />
                   Lead
@@ -576,6 +576,7 @@ function TaskCard({
             <Button
               variant="outline"
               size="sm"
+              className="min-h-10"
               disabled={completing}
               onClick={async () => {
                 setCompleting(true);
@@ -590,7 +591,7 @@ function TaskCard({
               Concluir
             </Button>
           ) : null}
-          <Button variant="outline" size="sm" onClick={() => onEdit(task)}>
+          <Button variant="outline" size="sm" className="min-h-10" onClick={() => onEdit(task)}>
             <Edit className="size-4" />
             Editar
           </Button>

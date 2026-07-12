@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useCrmData } from "@/hooks/use-crm-data";
+import { useNetworkStatus } from "@/lib/offline/network-status";
 import { isValidWhatsAppPhone, sanitizePhone } from "@/lib/business";
 import { analyzeLeadWithPuter, ensurePuterAuthorizedFromUserAction, isPuterReady } from "@/lib/ai/puter-client";
 import { analyzeLeadWithServer } from "@/lib/ai/server-client";
@@ -74,6 +75,7 @@ export function AILeadImport({
   serverProvider?: string | null;
 }) {
   const router = useRouter();
+  const network = useNetworkStatus();
   const { leads: existingLeads, saveLead, updateLead: updateExistingLead } = useCrmData();
   const [engine, setEngine] = React.useState<AIEngine>(serverAIConfigured ? "server" : "puter");
   const [scriptLoaded, setScriptLoaded] = React.useState(false);
@@ -296,6 +298,12 @@ export function AILeadImport({
             Revise os dados antes de salvar. A IA pode interpretar alguma informacao de forma errada.
           </div>
 
+          {!network.online ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 shadow-sm dark:border-red-900/50 dark:bg-red-950/25 dark:text-red-100">
+              Analise com IA precisa de internet. Voce pode cadastrar o lead manualmente agora e sincronizar depois.
+            </div>
+          ) : null}
+
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {[
               "Cole uma conversa ou envie um print",
@@ -339,10 +347,10 @@ export function AILeadImport({
 
           <Field label="Modo de IA" hint="A IA via servidor usa a chave protegida na Vercel. O Puter pede autorizacao no navegador.">
             <div className="grid grid-cols-2 gap-1 rounded-lg border bg-secondary/45 p-1" role="group" aria-label="Modo de IA">
-              <Button type="button" variant={engine === "server" ? "default" : "ghost"} onClick={() => setEngine("server")} aria-pressed={engine === "server"}>
+              <Button type="button" variant={engine === "server" ? "default" : "ghost"} className="min-h-12 sm:min-h-10" onClick={() => setEngine("server")} aria-pressed={engine === "server"}>
                 IA via servidor
               </Button>
-              <Button type="button" variant={engine === "puter" ? "default" : "ghost"} onClick={() => setEngine("puter")} aria-pressed={engine === "puter"}>
+              <Button type="button" variant={engine === "puter" ? "default" : "ghost"} className="min-h-12 sm:min-h-10" onClick={() => setEngine("puter")} aria-pressed={engine === "puter"}>
                 Puter no navegador
               </Button>
             </div>
@@ -379,7 +387,7 @@ export function AILeadImport({
                   <p>PNG, JPG, JPEG ou WEBP. Maximo de {MAX_IMAGES} imagens, 5 MB por arquivo.</p>
                   <p>As imagens sao usadas apenas na analise e nao sao salvas no banco.</p>
                 </div>
-                <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm font-medium shadow-xs transition hover:-translate-y-0.5 hover:bg-secondary hover:shadow-sm">
+                <label className="inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm font-medium shadow-xs transition hover:-translate-y-0.5 hover:bg-secondary hover:shadow-sm sm:min-h-10">
                   <Upload className="size-4" />
                   Selecionar imagens
                   <input className="sr-only" type="file" accept="image/png,image/jpeg,image/jpg,image/webp" multiple onChange={handleImagesChange} />
@@ -421,17 +429,17 @@ export function AILeadImport({
           ) : null}
 
           <div className="flex flex-col gap-2 sm:flex-row">
-            <Button type="button" onClick={analyzeConversation} disabled={isAnalyzing}>
+            <Button type="button" className="min-h-12 sm:min-h-10" onClick={analyzeConversation} disabled={isAnalyzing || !network.online}>
               {isAnalyzing ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
               {isAnalyzing ? `Analisando via ${engine === "server" ? "servidor" : "Puter"}...` : "Analisar com IA"}
             </Button>
             {analysisError ? (
-              <Button type="button" variant="outline" onClick={analyzeConversation} disabled={isAnalyzing || !hasInput}>
+              <Button type="button" variant="outline" className="min-h-12 sm:min-h-10" onClick={analyzeConversation} disabled={isAnalyzing || !hasInput || !network.online}>
                 <RotateCcw className="size-4" />
                 Tentar novamente
               </Button>
             ) : null}
-            <Button type="button" variant="outline" onClick={clearAll}>
+            <Button type="button" variant="outline" className="min-h-12 sm:min-h-10" onClick={clearAll}>
               <Trash2 className="size-4" />
               Limpar
             </Button>

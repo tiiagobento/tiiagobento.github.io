@@ -36,11 +36,13 @@ export function OfflineStatus({ compact = false }: { compact?: boolean }) {
   const label = !network.online
     ? compact
       ? "Offline"
-      : "Offline - alteracoes serao sincronizadas depois"
+      : "Offline - alteracoes serao salvas e sincronizadas depois"
     : hasErrors
-      ? "Algumas alteracoes nao sincronizaram"
+      ? "Algumas alteracoes precisam de atencao"
       : hasPending
-        ? `Sincronizacao pendente (${summary.pending})`
+        ? compact
+          ? `Sincronizando (${summary.pending})`
+          : "Sincronizando alteracoes..."
         : "Online";
   const Icon = !network.online ? CloudOff : hasErrors ? TriangleAlert : hasPending ? RefreshCw : CheckCircle2;
 

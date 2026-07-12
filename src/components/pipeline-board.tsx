@@ -40,6 +40,7 @@ const statusStyles: Record<LeadStatus, string> = {
 };
 
 export function PipelineBoard({ leads, onMove }: { leads: Lead[]; onMove: (id: string, status: LeadStatus) => Promise<void> }) {
+  const [activeStatus, setActiveStatus] = React.useState<LeadStatus>("Novo lead");
   const [filters, setFilters] = React.useState<PipelineFilters>({
     query: "",
     priority: "Todas",
@@ -76,6 +77,8 @@ export function PipelineBoard({ leads, onMove }: { leads: Lead[]; onMove: (id: s
     }
   }
 
+  const mobileStatusLeads = filteredLeads.filter((lead) => lead.status === activeStatus);
+
   return (
     <div className="space-y-4">
       <Card className="border-primary/10">
@@ -95,7 +98,49 @@ export function PipelineBoard({ leads, onMove }: { leads: Lead[]; onMove: (id: s
         </CardContent>
       </Card>
 
-      <div className="overflow-x-auto rounded-xl border bg-secondary/35 p-3 shadow-inner shadow-slate-950/[0.03] dark:bg-black/15 dark:shadow-black/30">
+      <div className="lg:hidden">
+        <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {pipelineStatuses.map((status) => {
+            const count = filteredLeads.filter((lead) => lead.status === status).length;
+            const active = status === activeStatus;
+            return (
+              <button
+                key={status}
+                type="button"
+                onClick={() => setActiveStatus(status)}
+                className={cn(
+                  "min-h-11 shrink-0 rounded-full border bg-card px-3.5 text-sm font-semibold text-muted-foreground shadow-sm transition active:scale-[0.98]",
+                  active && "border-primary bg-primary text-primary-foreground shadow-md shadow-primary/15",
+                )}
+                aria-pressed={active}
+              >
+                {compactStatus(status)}
+                <span className={cn("ml-2 rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground", active && "bg-white/15 text-white")}>{count}</span>
+              </button>
+            );
+          })}
+        </div>
+        <section className={cn("mt-2 rounded-2xl border p-3 shadow-sm", statusStyles[activeStatus])}>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="font-semibold text-primary">{activeStatus}</h2>
+              <p className="text-xs text-muted-foreground">{mobileStatusLeads.filter((lead) => lead.lead_score >= 70).length} lead(s) quente(s)</p>
+            </div>
+            <span className="rounded-full bg-card px-3 py-1 text-sm font-semibold shadow-xs ring-1 ring-border">{mobileStatusLeads.length}</span>
+          </div>
+          <div className="grid gap-3">
+            {mobileStatusLeads.length ? (
+              mobileStatusLeads.map((lead) => <PipelineLeadCard key={lead.id} lead={lead} movingKey={movingKey} onMove={(nextStatus) => moveLead(lead, nextStatus)} />)
+            ) : (
+              <div className="rounded-2xl border border-dashed bg-white/60 p-6 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/5">
+                Nenhum lead nesta etapa com os filtros atuais.
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
+
+      <div className="hidden overflow-x-auto rounded-xl border bg-secondary/35 p-3 shadow-inner shadow-slate-950/[0.03] dark:bg-black/15 dark:shadow-black/30 lg:block">
         <div className="grid auto-cols-[minmax(18.5rem,18.5rem)] grid-flow-col gap-3 pb-2">
           {pipelineStatuses.map((status) => {
             const columnLeads = filteredLeads.filter((lead) => lead.status === status);
@@ -129,6 +174,21 @@ export function PipelineBoard({ leads, onMove }: { leads: Lead[]; onMove: (id: s
       </div>
     </div>
   );
+}
+
+function compactStatus(status: LeadStatus) {
+  const labels: Partial<Record<LeadStatus, string>> = {
+    "Novo lead": "Novo",
+    "Aguardando resposta": "Aguardando",
+    "Em triagem": "Triagem",
+    "Visita a marcar": "Visita",
+    "Visita marcada": "Marcada",
+    "Visita realizada": "Realizada",
+    "Orcamento a enviar": "Orcamento",
+    "Orcamento enviado": "Enviado",
+    "Em negociacao": "Negociacao",
+  };
+  return labels[status] ?? status;
 }
 
 function PipelineLeadCard({ lead, movingKey, onMove }: { lead: Lead; movingKey: string | null; onMove: (status: LeadStatus) => Promise<void> }) {

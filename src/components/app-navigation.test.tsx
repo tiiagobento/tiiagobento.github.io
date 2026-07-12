@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppHeader } from "@/components/app-header";
 import { AppSidebar } from "@/components/app-sidebar";
 import { getVisibleNavigationItems, navigationItems } from "@/components/app-navigation";
+import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 
 const routerMocks = vi.hoisted(() => ({
   replace: vi.fn(),
@@ -88,6 +89,23 @@ describe("app navigation", () => {
     await waitFor(() => expect(supabaseMocks.signOut).toHaveBeenCalled());
     expect(routerMocks.replace).toHaveBeenCalledWith("/login");
     expect(routerMocks.refresh).toHaveBeenCalled();
+  });
+
+  it("renders Android-style bottom navigation and exposes more actions", async () => {
+    render(<MobileBottomNav />);
+
+    expect(screen.getByRole("link", { name: "Inicio" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Leads" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Pipeline" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Tarefas" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Abrir mais opcoes" }));
+
+    expect(await screen.findByRole("link", { name: "Novo lead" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Templates" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Importar com IA" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Configuracoes" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sair" })).toBeInTheDocument();
   });
 
   it("limits partner navigation to the partner panel plus logout", () => {

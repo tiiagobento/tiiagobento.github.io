@@ -70,3 +70,16 @@ O logout remove a sessao Supabase e limpa os dados locais do usuario neste dispo
 5. Veja a pendencia em `/settings`.
 6. Ligue a internet.
 7. Clique em `Sincronizar agora` ou aguarde a sincronizacao automatica.
+
+## Experiencia mobile premium
+
+No mobile/Android, o estado de rede aparece de forma compacta no header e tambem no menu Mais da bottom navigation.
+
+Textos esperados:
+
+- Online: `Online`
+- Offline: `Offline - alteracoes serao salvas e sincronizadas depois`
+- Sincronizando: `Sincronizando alteracoes...`
+- Erro: `Algumas alteracoes precisam de atencao`
+
+Quando o aparelho estiver offline, a tela de IA informa que a analise precisa de internet e orienta o usuario a cadastrar o lead manualmente para sincronizar depois. A tela `public/offline.html` tambem foi estilizada para parecer parte do app e oferece o botao `Tentar novamente`.

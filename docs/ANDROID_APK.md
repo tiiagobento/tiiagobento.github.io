@@ -51,3 +51,42 @@ Para release de loja, configure uma keystore no Android Studio ou no Gradle loca
 ## Limites
 
 Funciona offline para dados ja sincronizados e operacoes basicas. Login novo, IA, Puter, analise de prints e sincronizacao com Supabase precisam de internet.
+
+## Experiencia mobile premium
+
+A versao Android usa a mesma aplicacao web em producao, mas com ajustes especificos para celular:
+
+- bottom navigation fixa com Inicio, Leads, Pipeline, Tarefas e Mais
+- menu Mais com Novo lead, Templates, Importar com IA, Parceiro, Configuracoes, sync/offline e Sair
+- area segura para status bar e navigation bar usando `env(safe-area-inset-*)`
+- botoes principais com area de toque maior
+- Dashboard mobile priorizando novo lead, IA, leads quentes, tarefas atrasadas e proximas acoes
+- Pipeline mobile por chips de status, evitando colunas espremidas
+- cards de leads com WhatsApp e Abrir sempre visiveis
+- tela offline visualmente alinhada ao app
+
+## Gerar novo APK debug
+
+No Windows, com JDK e Android SDK configurados:
+
+```powershell
+npm run typecheck
+npm run lint
+npm run test
+npm run build
+npx cap sync android
+cd android
+.\gradlew.bat assembleDebug
+```
+
+Arquivo final:
+
+```text
+E:\NovaFormaCRM\android\app\build\outputs\apk\debug\app-debug.apk
+```
+
+Para instalar via USB:
+
+```powershell
+C:\Users\tiago\AppData\Local\Android\Sdk\platform-tools\adb.exe install -r E:\NovaFormaCRM\android\app\build\outputs\apk\debug\app-debug.apk
+```

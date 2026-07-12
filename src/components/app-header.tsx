@@ -33,7 +33,7 @@ export function AppHeader() {
   const { logout, isLoggingOut, icon: LogoutIcon } = useLogout();
 
   return (
-    <header className="sticky top-0 z-30 border-b bg-background/86 shadow-sm shadow-slate-950/[0.025] backdrop-blur-xl">
+    <header className="app-safe-top sticky top-0 z-30 border-b bg-background/86 shadow-sm shadow-slate-950/[0.025] backdrop-blur-xl">
       <div className="flex min-h-16 items-center justify-between gap-3 px-4 sm:px-6">
         <div className="flex min-w-0 items-center gap-3">
           <MobileNavigation
@@ -45,8 +45,8 @@ export function AppHeader() {
             LogoutIcon={LogoutIcon}
           />
           <div className="min-w-0">
-          <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Steel frame sales</p>
-          <h2 className="truncate text-xl font-semibold text-foreground">{title}</h2>
+          <p className="hidden text-xs uppercase tracking-[0.18em] text-muted-foreground sm:block">Steel frame sales</p>
+          <h2 className="truncate text-lg font-semibold text-foreground sm:text-xl">{title}</h2>
           </div>
         </div>
         <div className="hidden min-w-80 items-center rounded-full border bg-card/92 px-4 shadow-sm shadow-slate-950/[0.035] transition focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/15 md:flex">

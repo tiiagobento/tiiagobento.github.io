@@ -235,7 +235,7 @@ function TemplateForm({
           </Field>
           <div className="flex flex-wrap gap-2">
             {templateVariables.map((variable) => (
-              <button key={variable} type="button" onClick={() => onInsertVariable(variable)} className="rounded-full border bg-secondary px-2.5 py-1 text-xs font-medium transition hover:-translate-y-0.5 hover:bg-secondary/70 hover:shadow-sm">
+              <button key={variable} type="button" onClick={() => onInsertVariable(variable)} className="min-h-9 rounded-full border bg-secondary px-3 py-1 text-xs font-medium transition hover:-translate-y-0.5 hover:bg-secondary/70 hover:shadow-sm">
                 {variable}
               </button>
             ))}
@@ -247,7 +247,7 @@ function TemplateForm({
                 Cancelar edicao
               </Button>
             ) : null}
-            <Button className="w-full" disabled={saving}>
+            <Button className="min-h-12 w-full sm:min-h-10" disabled={saving}>
               {saving ? "Salvando..." : draft.id ? "Salvar alteracoes" : "Salvar template"}
             </Button>
           </div>
@@ -323,11 +323,11 @@ function TemplateCard({
       <CardContent className="space-y-4">
         <div className="min-h-36 whitespace-pre-line rounded-xl border bg-secondary/35 p-3 text-sm leading-6 shadow-inner shadow-slate-950/[0.03]">{renderedMessage}</div>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-          <Button variant="outline" onClick={copyMessage} className="sm:flex-1">
+          <Button variant="outline" onClick={copyMessage} className="min-h-12 sm:min-h-10 sm:flex-1">
             <Copy className="size-4" />
             Copiar mensagem
           </Button>
-          <Button type="button" variant="accent" onClick={openWhatsApp} className="sm:flex-1">
+          <Button type="button" variant="accent" onClick={openWhatsApp} className="min-h-12 sm:min-h-10 sm:flex-1">
             <MessageCircle className="size-4" />
             Abrir WhatsApp
           </Button>
@@ -335,6 +335,7 @@ function TemplateCard({
             <Button
               type="button"
               variant="secondary"
+              className="min-h-12 sm:min-h-10"
               disabled={copyingDefault}
               onClick={async () => {
                 setCopyingDefault(true);

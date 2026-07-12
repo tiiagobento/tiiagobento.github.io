@@ -207,6 +207,8 @@ No PowerShell do Windows, se `npm` for bloqueado por execution policy, use `npm.
 
 O CRM possui manifesto PWA, service worker, app shell cacheado e banco local com IndexedDB/Dexie. Online, o Supabase continua sendo a fonte real dos dados. Offline, o app mostra dados ja sincronizados, permite operacoes basicas e cria uma fila local para sincronizar quando a conexao voltar.
 
+A experiencia mobile foi ajustada para parecer app Android: bottom navigation fixa, menu Mais com logout e sincronizacao, safe-area para barras do sistema, cards compactos de leads, pipeline por chips de status no celular e tela offline com visual do CRM.
+
 Documentacao:
 
 - `docs/OFFLINE_MODE.md`
