@@ -12,7 +12,8 @@
     "test:e2e": "playwright test",
     "android:sync": "cap sync android",
     "android:debug": "cd android && gradlew.bat assembleDebug",
-    "android:release": "cd android && gradlew.bat bundleRelease"
+    "android:release": "cd android && gradlew.bat assembleRelease",
+    "android:bundle": "cd android && gradlew.bat bundleRelease"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.1",

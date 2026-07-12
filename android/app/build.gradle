@@ -3,6 +3,12 @@ apply plugin: 'com.android.application'
 android {
     namespace = "br.com.novaforma.crm"
     compileSdk = rootProject.ext.compileSdkVersion
+    def releaseKeystorePath = System.getenv("NOVAFORMA_ANDROID_KEYSTORE_PATH")
+    def releaseKeystorePassword = System.getenv("NOVAFORMA_ANDROID_KEYSTORE_PASSWORD")
+    def releaseKeyAlias = System.getenv("NOVAFORMA_ANDROID_KEY_ALIAS")
+    def releaseKeyPassword = System.getenv("NOVAFORMA_ANDROID_KEY_PASSWORD")
+    def hasReleaseSigning = releaseKeystorePath && releaseKeystorePassword && releaseKeyAlias && releaseKeyPassword
+
     defaultConfig {
         applicationId "br.com.novaforma.crm"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -16,9 +22,22 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (hasReleaseSigning) {
+                storeFile file(releaseKeystorePath)
+                storePassword releaseKeystorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }

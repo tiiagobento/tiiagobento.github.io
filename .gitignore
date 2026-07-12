@@ -21,3 +21,13 @@ coverage/
 .vercel
 .env*
 !.env.example
+
+# Android signing and generated release artifacts
+*.jks
+*.keystore
+android/keystores/
+android/app/release/
+android/app/*.jks
+android/app/*.keystore
+android/app/build/outputs/**/*.apk
+android/app/build/outputs/**/*.aab
