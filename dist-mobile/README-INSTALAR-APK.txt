@@ -88,26 +88,42 @@ Este modo funciona melhor em Android 11 ou superior.
 
 3. Ative "Depuracao sem fio".
 
-4. Toque em "Parear dispositivo com codigo de pareamento".
+4. Para parear com QR Code, rode:
 
-5. Rode nesta pasta:
+   PAREAR-WIFI-QR.bat
+
+   Ele vai gerar e abrir o arquivo:
+
+   qr-pareamento-adb.png
+
+   No celular, toque em "Parear o dispositivo com um codigo QR" e escaneie esse QR.
+
+5. Se o pareamento por QR funcionar, rode:
+
+   INSTALAR-VIA-WIFI.bat
+
+Pareamento por codigo, alternativa manual:
+
+1. Toque em "Parear dispositivo com codigo de pareamento".
+
+2. Rode nesta pasta:
 
    PAREAR-WIFI.bat
 
-6. Digite o IP:PORTA de pareamento mostrado no celular.
+3. Digite o IP:PORTA de pareamento mostrado no celular.
    Exemplo: 192.168.0.25:42137
 
-7. Quando o ADB pedir, digite o codigo de pareamento.
+4. Quando o ADB pedir, digite o codigo de pareamento.
 
-8. Depois do pareamento, volte na tela "Depuracao sem fio" e veja o IP:PORTA de conexao.
+5. Depois do pareamento, volte na tela "Depuracao sem fio" e veja o IP:PORTA de conexao.
    Normalmente e outra porta.
    Exemplo: 192.168.0.25:38791
 
-9. Rode:
+6. Rode:
 
    CONECTAR-WIFI.bat
 
-10. Se aparecer "device", rode:
+7. Se aparecer "device", rode:
 
    INSTALAR-VIA-WIFI.bat
 

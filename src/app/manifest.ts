@@ -13,6 +13,18 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#0b2530",
     icons: [
       {
+        src: "/icons/nova-forma-icon-192.png",
+        sizes: "192x192",
+        type: "image/png",
+        purpose: "any",
+      },
+      {
+        src: "/icons/nova-forma-icon-512.png",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "any",
+      },
+      {
         src: "/icons/nova-forma-icon.svg",
         sizes: "any",
         type: "image/svg+xml",
