@@ -2,6 +2,13 @@
 
 Use este roteiro depois de instalar `app-debug.apk` no celular.
 
+## Instalacao
+
+- [ ] Se for via USB, `VERIFICAR-CELULAR.bat` mostra o aparelho como `device`.
+- [ ] Se for via Wi-Fi, `PAREAR-WIFI.bat` pareou com codigo.
+- [ ] Se for via Wi-Fi, `CONECTAR-WIFI.bat` conectou no IP:PORTA do celular.
+- [ ] `INSTALAR-VIA-USB.bat` ou `INSTALAR-VIA-WIFI.bat` instalou o APK com sucesso.
+
 ## Teste online
 
 - [ ] Abrir app.

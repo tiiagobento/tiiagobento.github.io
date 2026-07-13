@@ -50,7 +50,48 @@ Este APK e uma versao de teste/debug do Nova Forma CRM para Android.
    INSTALAR-VIA-USB.bat
 
 
-3. SE APARECER "UNAUTHORIZED"
+3. INSTALAR VIA DEPURACAO WI-FI
+-------------------------------
+
+Este modo funciona melhor em Android 11 ou superior.
+
+1. No celular, ative o modo desenvolvedor.
+
+2. Entre em:
+   Configuracoes > Sistema > Opcoes do desenvolvedor.
+
+3. Ative "Depuracao sem fio".
+
+4. Toque em "Parear dispositivo com codigo de pareamento".
+
+5. Rode nesta pasta:
+
+   PAREAR-WIFI.bat
+
+6. Digite o IP:PORTA de pareamento mostrado no celular.
+   Exemplo: 192.168.0.25:42137
+
+7. Quando o ADB pedir, digite o codigo de pareamento.
+
+8. Depois do pareamento, volte na tela "Depuracao sem fio" e veja o IP:PORTA de conexao.
+   Normalmente e outra porta.
+   Exemplo: 192.168.0.25:38791
+
+9. Rode:
+
+   CONECTAR-WIFI.bat
+
+10. Se aparecer "device", rode:
+
+   INSTALAR-VIA-WIFI.bat
+
+Importante:
+- computador e celular precisam estar na mesma rede Wi-Fi.
+- mantenha a depuracao sem fio ativa.
+- se trocar de rede, provavelmente sera necessario conectar novamente.
+
+
+4. SE APARECER "UNAUTHORIZED"
 -----------------------------
 
 1. Desbloqueie o celular.
@@ -61,7 +102,7 @@ Este APK e uma versao de teste/debug do Nova Forma CRM para Android.
 6. Confirme se a depuracao USB esta ativa.
 
 
-4. SE O ANDROID BLOQUEAR A INSTALACAO
+5. SE O ANDROID BLOQUEAR A INSTALACAO
 -------------------------------------
 
 1. Abra Configuracoes.
@@ -72,7 +113,7 @@ Este APK e uma versao de teste/debug do Nova Forma CRM para Android.
 5. Abra o APK novamente.
 
 
-5. DEPOIS DE INSTALAR
+6. DEPOIS DE INSTALAR
 ---------------------
 
 1. Abra o app Nova Forma CRM.
