@@ -26,6 +26,8 @@ coverage/
 *.jks
 *.keystore
 android/keystores/
+android/signing.env.ps1
+android/key.properties
 android/app/release/
 android/app/*.jks
 android/app/*.keystore
@@ -33,5 +35,6 @@ android/app/build/outputs/**/*.apk
 android/app/build/outputs/**/*.aab
 dist-mobile/*.apk
 dist-mobile/*.aab
+dist-mobile/*.log
 dist-mobile/qr-*.png
 dist-mobile/android-app-open.png
