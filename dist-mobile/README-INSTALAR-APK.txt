@@ -26,6 +26,32 @@ Este APK e uma versao de teste/debug do Nova Forma CRM para Android.
 6. Abra o app "Nova Forma CRM".
 
 
+1.1 BAIXAR PELO QR CODE NA MESMA REDE WI-FI
+-------------------------------------------
+
+1. Garanta que computador e celular estao no mesmo Wi-Fi.
+
+2. Nesta pasta, rode:
+
+   GERAR-QR-APK-WIFI.bat
+
+3. Depois rode:
+
+   ABRIR-SERVIDOR-APK.bat
+
+4. Deixe a janela do servidor aberta.
+
+5. No celular, abra a camera e escaneie:
+
+   qr-instalar-apk-local.png
+
+6. Baixe o APK e abra o arquivo no Android.
+
+7. Se o Android bloquear a instalacao, permita "Instalar apps desconhecidos".
+
+Observacao: o QR do APK local depende do IP atual do computador. Se mudar de rede, rode GERAR-QR-APK-WIFI.bat novamente.
+
+
 2. INSTALAR VIA USB
 -------------------
 
