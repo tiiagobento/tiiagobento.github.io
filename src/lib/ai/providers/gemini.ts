@@ -6,7 +6,7 @@ export function createGeminiProvider(apiKey: string): AIProvider {
     name: "gemini",
     supportsImages: true,
     async generate(input) {
-      const model = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
+      const model = process.env.GEMINI_MODEL?.trim() || "gemini-3.1-flash-lite";
       const parts: Array<Record<string, unknown>> = [{ text: input.prompt }];
 
       for (const image of input.images) {

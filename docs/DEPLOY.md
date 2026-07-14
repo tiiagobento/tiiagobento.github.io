@@ -258,7 +258,7 @@ Os limites gratuitos podem mudar. Confirme o plano e os limites atuais antes de 
 3. Configure `AI_PROVIDER=gemini` e `GEMINI_API_KEY`.
 4. Consulte a [documentacao oficial de chaves](https://ai.google.dev/gemini-api/docs/api-key) e os [precos/free tier](https://ai.google.dev/gemini-api/docs/pricing).
 
-Modelo padrao: `gemini-2.5-flash`. Use Gemini para a analise server-side de prints/imagens.
+Modelo padrao: `gemini-3.1-flash-lite`. Use Gemini para a analise server-side de prints/imagens.
 
 #### Groq
 
