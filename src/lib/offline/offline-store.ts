@@ -1,7 +1,7 @@
 import { getOfflineDb, type LocalRecord } from "@/lib/offline/db";
 import type { Interaction, Lead, MessageTemplate, Profile, Task } from "@/lib/types";
 
-type CrmSnapshot = {
+export type CrmSnapshot = {
   leads: Lead[];
   interactions: Interaction[];
   tasks: Task[];
@@ -28,20 +28,59 @@ function toLocalRecord<T extends { id: string; user_id?: string | null }>(item: 
   };
 }
 
-export async function saveCrmSnapshot(userId: string, snapshot: CrmSnapshot) {
+type SnapshotTable = "leads" | "interactions" | "tasks" | "message_templates" | "profiles";
+
+async function mergeSnapshotTable<T extends { id: string; user_id?: string | null }>(
+  tableName: SnapshotTable,
+  userId: string,
+  remoteItems: T[],
+) {
   const db = getOfflineDb();
-  if (!db) return;
+  if (!db) return remoteItems;
+
+  const table = db.table<LocalRecord<T>, string>(tableName);
+  const localRecords = await table.where("user_id").equals(userId).toArray();
+  const localChanges = new Map(
+    localRecords
+      .filter((record) => record.sync_status !== "synced" || record.operation)
+      .map((record) => [record.id, record]),
+  );
+  const remoteIds = new Set(remoteItems.map((item) => item.id));
+
+  const recordsToSave = remoteItems
+    .filter((item) => !localChanges.has(item.id))
+    .map((item) => toLocalRecord(item, userId));
+
+  const staleSyncedIds = localRecords
+    .filter((record) => record.sync_status === "synced" && !record.operation && !remoteIds.has(record.id))
+    .map((record) => record.id);
+
+  if (recordsToSave.length) await table.bulkPut(recordsToSave);
+  if (staleSyncedIds.length) await table.bulkDelete(staleSyncedIds);
+
+  return [...remoteItems.filter((item) => !localChanges.has(item.id)), ...[...localChanges.values()]
+    .filter((record) => record.operation !== "delete")
+    .map((record) => record.data)];
+}
+
+export async function saveCrmSnapshot(userId: string, snapshot: CrmSnapshot): Promise<CrmSnapshot> {
+  const db = getOfflineDb();
+  if (!db) return snapshot;
 
   await db.transaction("rw", [db.leads, db.interactions, db.tasks, db.message_templates, db.profiles, db.dashboard_snapshots], async () => {
-    await Promise.all([
-      db.leads.bulkPut(snapshot.leads.map((lead) => toLocalRecord(lead, userId))),
-      db.interactions.bulkPut(snapshot.interactions.map((interaction) => toLocalRecord(interaction, userId))),
-      db.tasks.bulkPut(snapshot.tasks.map((task) => toLocalRecord(task, userId))),
-      db.message_templates.bulkPut(snapshot.templates.map((template) => toLocalRecord(template, userId))),
-      db.profiles.bulkPut(snapshot.profiles.map((profile) => toLocalRecord(profile, userId))),
-      db.dashboard_snapshots.put({ id: `dashboard:${userId}`, user_id: userId, data: snapshot, updated_at: now() }),
+    const [leads, interactions, tasks, templates, profiles] = await Promise.all([
+      mergeSnapshotTable("leads", userId, snapshot.leads),
+      mergeSnapshotTable("interactions", userId, snapshot.interactions),
+      mergeSnapshotTable("tasks", userId, snapshot.tasks),
+      mergeSnapshotTable("message_templates", userId, snapshot.templates),
+      mergeSnapshotTable("profiles", userId, snapshot.profiles),
     ]);
+
+    const mergedSnapshot = { leads, interactions, tasks, templates, profiles } as CrmSnapshot;
+    await db.dashboard_snapshots.put({ id: `dashboard:${userId}`, user_id: userId, data: mergedSnapshot, updated_at: now() });
   });
+
+  return loadCrmSnapshot(userId).then((localSnapshot) => localSnapshot ?? snapshot);
 }
 
 export async function loadCrmSnapshot(userId: string): Promise<CrmSnapshot | null> {
@@ -80,4 +119,14 @@ export async function putLocalRecord<T extends { id: string; user_id?: string | 
     updated_at: now(),
   };
   await db.table(table).put(record);
+}
+
+export async function putSyncedLocalRecord<T extends { id: string; user_id?: string | null }>(
+  table: "leads" | "tasks" | "interactions" | "message_templates",
+  item: T,
+  userId: string,
+) {
+  const db = getOfflineDb();
+  if (!db) return;
+  await db.table(table).put(toLocalRecord(item, userId, "synced"));
 }

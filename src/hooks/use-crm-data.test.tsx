@@ -83,7 +83,7 @@ vi.mock("@/lib/offline/network-status", () => ({
 vi.mock("@/lib/offline/offline-store", () => ({
   loadCrmSnapshot: vi.fn(async () => null),
   putLocalRecord: vi.fn(async () => undefined),
-  saveCrmSnapshot: vi.fn(async () => undefined),
+  saveCrmSnapshot: vi.fn(async (_userId: string, snapshot: unknown) => snapshot),
 }));
 
 vi.mock("@/lib/offline/sync-queue", () => ({

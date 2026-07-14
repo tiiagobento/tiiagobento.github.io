@@ -10,6 +10,7 @@ import { loadCrmSnapshot, putLocalRecord, saveCrmSnapshot } from "@/lib/offline/
 import { enqueueOperation, getSyncSummary, retryFailedOperations, syncPendingOperations, type SyncSummary } from "@/lib/offline/sync-queue";
 import { interactionSchema } from "@/lib/schemas";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase/client";
+import { clearPrivateRuntimeCache } from "@/lib/offline/pwa-cache";
 import type { Interaction, Lead, MessageTemplate, Profile, Task } from "@/lib/types";
 
 type CrmState = {
@@ -41,6 +42,7 @@ export function useCrmData() {
   const [configurationError, setConfigurationError] = React.useState<string | null>(null);
   const [syncSummary, setSyncSummary] = React.useState<SyncSummary>({ pending: 0, failed: 0, conflict: 0, operations: [] });
   const [syncing, setSyncing] = React.useState(false);
+  const automaticSyncInProgress = React.useRef(false);
   const network = useNetworkStatus();
 
   const refreshSyncSummary = React.useCallback(async (userId = currentUserId) => {
@@ -149,9 +151,9 @@ export function useCrmData() {
         profiles: (profiles ?? []) as Profile[],
       };
 
+      const mergedSnapshot = await saveCrmSnapshot(userData.user.id, nextState);
       setConfigurationError(null);
-      setState(nextState);
-      await saveCrmSnapshot(userData.user.id, nextState);
+      setState(mergedSnapshot);
       await refreshSyncSummary(userData.user.id);
     } catch (error) {
       console.error(error);
@@ -179,7 +181,8 @@ export function useCrmData() {
 
   React.useEffect(() => {
     async function syncWhenOnline() {
-      if (!network.online || !currentUserId || syncing) return;
+      if (!network.online || !currentUserId || automaticSyncInProgress.current) return;
+      automaticSyncInProgress.current = true;
       setSyncing(true);
       try {
         const result = await syncPendingOperations(currentUserId);
@@ -191,12 +194,13 @@ export function useCrmData() {
         }
         if (result.failed > 0) toast.error("Algumas alteracoes nao sincronizaram.");
       } finally {
+        automaticSyncInProgress.current = false;
         setSyncing(false);
       }
     }
 
     void syncWhenOnline();
-  }, [currentUserId, network.online, refresh, refreshSyncSummary, syncing]);
+  }, [currentUserId, network.online, refresh, refreshSyncSummary]);
 
   React.useEffect(() => {
     function updateQueue() {
@@ -213,6 +217,8 @@ export function useCrmData() {
       toast.error("Voce esta offline. Conecte-se para sincronizar.");
       return;
     }
+    if (automaticSyncInProgress.current) return;
+    automaticSyncInProgress.current = true;
     setSyncing(true);
     try {
       const result = await syncPendingOperations(currentUserId);
@@ -220,6 +226,7 @@ export function useCrmData() {
       if (result.synced > 0) toast.success(`${result.synced} alteracao(oes) sincronizada(s).`);
       if (result.failed > 0) toast.error("Algumas alteracoes nao sincronizaram.");
     } finally {
+      automaticSyncInProgress.current = false;
       setSyncing(false);
     }
   }
@@ -545,6 +552,7 @@ export function useCrmData() {
       if (error) throw error;
     }
     if (userId) await clearOfflineDbForUser(userId);
+    clearPrivateRuntimeCache();
     setUserEmail(null);
     setCurrentUserId(null);
     setCurrentProfile(null);

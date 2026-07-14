@@ -1,5 +1,5 @@
 import { getOfflineDb, type OfflineEntity, type OfflineOperation, type PendingOperation } from "@/lib/offline/db";
-import { putLocalRecord } from "@/lib/offline/offline-store";
+import { putSyncedLocalRecord } from "@/lib/offline/offline-store";
 import { supabase } from "@/lib/supabase/client";
 
 function uuid() {
@@ -95,8 +95,7 @@ export async function syncPendingOperations(userId: string) {
       if (operation.operation === "delete") {
         await db.table(operation.entity).delete(operation.entity_id);
       } else if (data && typeof data === "object" && "id" in data) {
-        await putLocalRecord(operation.entity, data as { id: string; user_id?: string | null }, operation.user_id, "update");
-        await db.table(operation.entity).update(operation.entity_id, { sync_status: "synced", operation: null, last_error: null });
+        await putSyncedLocalRecord(operation.entity, data as { id: string; user_id?: string | null }, operation.user_id);
       }
       synced += 1;
     } catch (error) {

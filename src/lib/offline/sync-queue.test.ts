@@ -72,6 +72,10 @@ describe("offline sync queue", () => {
 
     await expect(syncPendingOperations("user-1")).resolves.toEqual({ synced: 1, failed: 0 });
     await expect(getSyncSummary("user-1")).resolves.toMatchObject({ pending: 0 });
+
+    const { getOfflineDb } = await import("@/lib/offline/db");
+    const localLead = await getOfflineDb()?.leads.get("lead-local-1");
+    expect(localLead).toMatchObject({ sync_status: "synced", operation: null, data: { name: "Lead offline" } });
   });
 
   it("does not sync while offline", async () => {

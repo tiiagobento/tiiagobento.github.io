@@ -1,6 +1,7 @@
 import { AppHeader } from "@/components/app-header";
 import { AppSidebar } from "@/components/app-sidebar";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
+import { OfflineWarmup } from "@/components/offline-warmup";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
@@ -23,6 +24,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen overflow-x-hidden lg:flex">
+      <OfflineWarmup />
       <AppSidebar />
       <div className="min-w-0 flex-1">
         <AppHeader />

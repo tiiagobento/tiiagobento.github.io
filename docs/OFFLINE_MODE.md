@@ -4,7 +4,7 @@ O app usa uma abordagem offline-first pragmatica:
 
 - online: Supabase continua sendo a fonte real dos dados, com Auth, RLS e Postgres.
 - offline: o app mostra o ultimo snapshot sincronizado em IndexedDB e enfileira alteracoes locais.
-- reconexao: a fila tenta sincronizar com Supabase usando a sessao real do usuario.
+- reconexao: a fila tenta sincronizar com Supabase usando a sessao real do usuario enquanto o CRM estiver aberto ou voltar ao primeiro plano.
 
 ## Funciona offline
 
@@ -53,13 +53,15 @@ Tabelas locais:
 
 Cada operacao pendente guarda entidade, id local/remoto, usuario, tipo da operacao, payload, status, erro e tentativas.
 
+Quando uma consulta remota termina, alteracoes locais pendentes continuam tendo prioridade no snapshot do dispositivo. Isso evita que uma resposta antiga do Supabase apague uma edicao feita sem internet antes de ela entrar na fila.
+
 ## Conflitos
 
 A regra atual e conservadora. Se a sincronizacao falhar, a operacao fica como `failed` e aparece em Settings. O usuario pode tentar novamente ou descartar a alteracao local. Sobrescrita automatica de conflitos complexos deve ser tratada futuramente por uma tela dedicada de revisao.
 
 ## Logout
 
-O logout remove a sessao Supabase e limpa os dados locais do usuario neste dispositivo. Isso evita deixar dados comerciais sensiveis dentro do APK depois que a conta sai.
+O logout remove a sessao Supabase, limpa os dados locais do usuario e descarta o cache de rotas privadas neste dispositivo. Isso evita deixar dados comerciais sensiveis disponiveis para a proxima pessoa que usar o aparelho.
 
 ## Teste manual
 
@@ -69,7 +71,9 @@ O logout remove a sessao Supabase e limpa os dados locais do usuario neste dispo
 4. Crie um lead ou tarefa.
 5. Veja a pendencia em `/settings`.
 6. Ligue a internet.
-7. Clique em `Sincronizar agora` ou aguarde a sincronizacao automatica.
+7. Clique em `Sincronizar agora` ou aguarde a sincronizacao automatica assim que o app detectar a conexao.
+
+O app nao promete sincronizacao em segundo plano quando estiver totalmente fechado pelo sistema. Nesse caso, abra-o novamente com internet para enviar a fila local com seguranca.
 
 ## Experiencia mobile premium
 

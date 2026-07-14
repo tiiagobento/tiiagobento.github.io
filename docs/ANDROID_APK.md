@@ -6,7 +6,7 @@ O Nova Forma CRM usa Capacitor Android com a aplicacao web em producao:
 - App ID: `br.com.novaforma.crm`
 - Nome: `Nova Forma CRM`
 
-Essa escolha evita forcar export estatico do Next.js App Router, que quebraria rotas privadas, Supabase Auth, API Routes de IA e SSR. O primeiro carregamento precisa de internet; depois, o service worker e o IndexedDB permitem abrir o app shell e trabalhar com dados sincronizados.
+Essa escolha evita forcar export estatico do Next.js App Router, que quebraria rotas privadas, Supabase Auth, API Routes de IA e SSR. O primeiro carregamento precisa de internet; depois, o service worker prepara as telas autenticadas e o IndexedDB permite abrir o app shell e trabalhar com dados sincronizados. O APK tambem usa o sinal de rede nativo do Android para iniciar a sincronizacao ao reconectar.
 
 ## Comandos
 
@@ -46,11 +46,11 @@ Para release de loja, configure uma keystore no Android Studio ou no Gradle loca
 5. Abra o app novamente.
 6. Crie um lead ou tarefa.
 7. Abra Settings e veja a operacao pendente.
-8. Reative a internet e sincronize.
+8. Reative a internet: o CRM sincroniza automaticamente quando estiver aberto; `Sincronizar agora` em Settings continua disponivel.
 
 ## Limites
 
-Funciona offline para dados ja sincronizados e operacoes basicas. Login novo, IA, Puter, analise de prints e sincronizacao com Supabase precisam de internet.
+Funciona offline para dados ja sincronizados e operacoes basicas. Login novo, IA, Puter, analise de prints e sincronizacao com Supabase precisam de internet. Se o Android encerrar o app por completo, abra-o novamente com internet para que a fila seja enviada.
 
 ## Experiencia mobile premium
 
