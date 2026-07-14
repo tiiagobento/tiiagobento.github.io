@@ -295,7 +295,11 @@ export function useCrmData() {
     await updateLead(id, { status });
   }
 
-  async function addInteraction(leadId: string, input: Omit<Interaction, "id" | "lead_id" | "created_at">) {
+  async function addInteraction(
+    leadId: string,
+    input: Omit<Interaction, "id" | "lead_id" | "created_at">,
+    leadUpdates: Partial<Pick<Lead, "status" | "priority">> = {},
+  ) {
     const now = new Date().toISOString();
     try {
       const lead = state.leads.find((item) => item.id === leadId);
@@ -305,7 +309,7 @@ export function useCrmData() {
       const userId = await getUserIdForWrite();
       const interactionWithUser = { ...interaction, user_id: userId };
       const task = buildFollowUpTaskFromInteraction({ lead, leadId, interaction: parsed });
-      const updatedLead = { ...lead, last_contact_at: now, next_action_at: parsed.next_contact_at ?? lead.next_action_at, updated_at: now };
+      const updatedLead = { ...lead, ...leadUpdates, last_contact_at: now, next_action_at: parsed.next_contact_at ?? lead.next_action_at, updated_at: now };
 
       if (!network.online) {
         updateLocalState((current) => ({
@@ -331,7 +335,7 @@ export function useCrmData() {
 
       const { error: leadError } = await supabase
         .from("leads")
-        .update({ last_contact_at: now, next_action_at: parsed.next_contact_at ?? lead.next_action_at, updated_at: now })
+        .update({ ...leadUpdates, last_contact_at: now, next_action_at: parsed.next_contact_at ?? lead.next_action_at, updated_at: now })
         .eq("id", leadId);
       if (leadError) throw leadError;
 

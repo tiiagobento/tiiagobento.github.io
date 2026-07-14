@@ -135,3 +135,62 @@ where email = 'seu-email-admin@exemplo.com';
 7. Bruno abre o briefing.
 8. Bruno registra retorno da visita.
 9. Admin volta ao lead e ve o retorno nos campos de parceiro.
+
+## Assistente de Execucao Diaria
+
+O dashboard integra um plano comercial automatico chamado `Meu dia`. Ele usa os leads, tarefas e interacoes reais que ja foram carregados pelo `useCrmData`, por isso funciona com Supabase online e com o snapshot IndexedDB quando o dispositivo esta offline.
+
+### O que fazer agora
+
+O primeiro bloco operacional do dashboard mostra uma unica acao por vez, com:
+
+- lead e etapa atual;
+- motivo objetivo da prioridade;
+- prazo ou quantidade de dias em atraso;
+- contexto essencial da obra;
+- tempo estimado;
+- acao principal;
+- acesso ao contexto, adiamento e conclusao;
+- progresso do dia.
+
+Ao concluir ou adiar, a proxima acao valida passa automaticamente para o topo.
+
+### Regras de priorizacao
+
+A ordem basica e deterministica e continua funcionando sem IA:
+
+1. visitas, reunioes e compromissos com horario definido;
+2. tarefas, proximos contatos e follow-ups atrasados;
+3. leads novos ou quentes sem atendimento;
+4. contatos programados para hoje;
+5. orcamentos aguardando retorno;
+6. negociacoes paradas;
+7. tarefas futuras.
+
+Dentro da mesma categoria, o motor considera prioridade, score, tempo sem contato e prazo. O modo `Reorganizar meu dia` pode colocar acoes mais rapidas primeiro apenas dentro da mesma faixa de urgencia; ele nunca ultrapassa compromissos ou atrasos reais.
+
+### Nova Forma IA
+
+O assistente oferece atalhos para comecar/encerrar o dia, mostrar prioridades, preparar WhatsApp, revisar atrasos e identificar leads que precisam de atencao. As explicacoes do plano sao derivadas dos dados locais. Quando o usuario pede uma mensagem, a rota autenticada `/api/ai/generate-message` personaliza o texto no servidor. Se o provider falhar, demorar ou estiver indisponivel, o CRM mantem um template local editavel.
+
+### Fluxo de WhatsApp
+
+1. O CRM escolhe um template coerente com origem e etapa.
+2. A IA pode personalizar o texto no servidor.
+3. O usuario revisa e edita a mensagem.
+4. O CRM abre o WhatsApp, sem enviar automaticamente.
+5. Na volta, o CRM pergunta o resultado.
+6. Depois da confirmacao, registra a interacao, atualiza o ultimo contato e a etapa, conclui a tarefa vinculada e cria o follow-up.
+
+Nenhuma comunicacao externa, exclusao ou marcacao como perdido acontece silenciosamente.
+
+Na ficha de cada lead, o atendente tambem pode colar a ultima mensagem recebida ou anexar ate tres prints de conversa. A rota autenticada de IA analisa texto e imagens no servidor quando o provider suporta visao, cria apenas uma sugestao editavel e nunca salva o print ou envia a mensagem automaticamente. O painel informa erros de configuracao, respostas invalidas e timeout sem manter a tela em loading.
+
+### Offline e automacao
+
+- A fila do dia e calculada localmente a partir do snapshot do CRM.
+- Conclusoes, adiamentos, interacoes e tarefas usam a fila offline existente.
+- Recomendacoes de IA exigem internet; templates e priorizacao continuam disponiveis sem conexao.
+- O progresso diario fica salvo localmente por data.
+- A configuracao oferece os niveis `Assistido`, `Semiautomatico` e `Automatico`.
+- O padrao e `Semiautomatico`; comunicacoes e acoes sensiveis sempre exigem confirmacao em qualquer nivel.

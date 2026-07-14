@@ -2,6 +2,10 @@ import type { AIImageInput } from "@/lib/ai/provider-types";
 
 export const AI_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 export const AI_IMAGE_MAX_COUNT = 5;
+export const AI_REPLY_IMAGE_MAX_COUNT = 3;
+// Inline base64 expands the payload. Keep a margin below Gemini's 20 MB inline-data limit.
+export const AI_REPLY_IMAGE_TOTAL_MAX_BYTES = 13 * 1024 * 1024;
+export const AI_REPLY_IMAGE_TOTAL_SIZE_MESSAGE = "Os prints excedem o limite total de 13 MB para uma analise. Remova ou reduza uma imagem.";
 
 export const AI_ACCEPTED_IMAGE_TYPES = new Set([
   "image/png",

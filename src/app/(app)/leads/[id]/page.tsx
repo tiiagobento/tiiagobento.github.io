@@ -22,6 +22,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { AIReplyComposer } from "@/components/ai/ai-reply-composer";
 import { EmptyState } from "@/components/empty-state";
 import { InteractionTimeline } from "@/components/interaction-timeline";
 import { LeadForm } from "@/components/lead-form";
@@ -668,7 +669,7 @@ function LeadTemplatePanel({
 
   async function copyMessage() {
     if (!message.trim()) {
-      toast.error("Escolha um template antes de copiar.");
+      toast.error("Escolha um template, gere uma resposta ou escreva uma mensagem antes de copiar.");
       return;
     }
     try {
@@ -681,8 +682,8 @@ function LeadTemplatePanel({
   }
 
   async function openWhatsApp() {
-    if (!selectedTemplate) {
-      toast.error("Escolha um template antes de abrir o WhatsApp.");
+    if (!message.trim()) {
+      toast.error("Escolha um template, gere uma resposta ou escreva uma mensagem antes de abrir o WhatsApp.");
       return;
     }
     if (!isValidWhatsAppPhone(lead.phone) || !whatsappUrl) {
@@ -699,12 +700,13 @@ function LeadTemplatePanel({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <MessageCircle className="size-5 text-accent" />
-          Mensagem por template
+          Mensagens e respostas com IA
         </CardTitle>
-        <CardDescription>Escolha uma mensagem cadastrada e envie com as variaveis preenchidas para este lead.</CardDescription>
+        <CardDescription>Use um template ou gere uma resposta com base na ultima mensagem do cliente, sempre com revisao antes do envio.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4 lg:grid-cols-[320px_1fr]">
         <div className="space-y-3">
+          <AIReplyComposer lead={lead} onGenerated={setMessage} />
           <Field label="Categoria">
             <Select value={category} onValueChange={setCategory}>
               <SelectTrigger>

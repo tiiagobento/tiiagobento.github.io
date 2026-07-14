@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { parseAIJsonResponse } from "@/lib/ai/parse-ai-json";
 import { AIConfigurationError, getConfiguredAIProvider } from "@/lib/ai/provider";
-import { AIProviderRequestError } from "@/lib/ai/providers/shared";
+import { AI_REPLY_IMAGE_TOTAL_MAX_BYTES, AI_REPLY_IMAGE_TOTAL_SIZE_MESSAGE, estimateBase64Bytes } from "@/lib/ai/image-utils";
+import { AIProviderRequestError, UNSUPPORTED_IMAGE_PROVIDER_MESSAGE } from "@/lib/ai/providers/shared";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -12,7 +13,17 @@ const requestSchema = z.object({
   context: z.string().max(10_000).optional().default(""),
   tone: z.enum(["profissional", "cordial", "direto"]).optional().default("profissional"),
   lead: z.record(z.string(), z.unknown()).optional().default({}),
-});
+  images: z.array(z.object({
+    mimeType: z.enum(["image/png", "image/jpeg", "image/jpg", "image/webp"]),
+    data: z.string().min(1).max(8_000_000),
+  })).max(3).optional().default([]),
+}).refine(
+  (input) => Boolean(input.context.trim()) || input.images.length > 0,
+  { message: "Cole a ultima mensagem do cliente ou envie ao menos um print." },
+).refine(
+  (input) => input.images.reduce((total, image) => total + estimateBase64Bytes(image.data), 0) <= AI_REPLY_IMAGE_TOTAL_MAX_BYTES,
+  { message: AI_REPLY_IMAGE_TOTAL_SIZE_MESSAGE },
+);
 
 const responseSchema = z.object({
   message: z.string().min(1).max(5_000),
@@ -31,8 +42,11 @@ export async function POST(request: Request) {
 
   try {
     const provider = getConfiguredAIProvider();
+    if (parsedRequest.data.images.length > 0 && !provider.supportsImages) {
+      return NextResponse.json({ error: UNSUPPORTED_IMAGE_PROVIDER_MESSAGE }, { status: 400 });
+    }
     const prompt = buildMessagePrompt(parsedRequest.data);
-    const raw = await provider.generate({ task: "generate-message", prompt, images: [] });
+    const raw = await provider.generate({ task: "generate-message", prompt, images: parsedRequest.data.images });
     const result = responseSchema.parse(parseAIJsonResponse(raw));
     return NextResponse.json({ ...result, provider: provider.name });
   } catch (error) {
@@ -68,6 +82,9 @@ Não invente dados. Use somente o contexto e os dados do lead fornecidos.
 Objetivo: ${input.objective}
 Contexto adicional: ${input.context || "Não informado"}
 Dados do lead: ${JSON.stringify(input.lead)}
+
+${input.images.length > 0 ? `Foram enviados ${input.images.length} print(s) de conversa. Leia somente dados claramente visiveis, identifique a mensagem mais recente do cliente quando possivel e nao assuma fatos escondidos, cortados ou ilegiveis.` : "Nao ha prints anexados."}
+Crie uma resposta humana, objetiva e util para avancar a conversa comercial. Se faltar informacao importante, faca no maximo duas perguntas curtas. Nao prometa prazo, preco ou visita sem confirmacao.
 
 Retorne exclusivamente JSON válido, sem markdown:
 {"message":"texto da mensagem","warnings":[]}

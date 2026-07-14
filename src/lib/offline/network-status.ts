@@ -13,10 +13,10 @@ export function getInitialOnlineState() {
 }
 
 export function useNetworkStatus() {
-  const [state, setState] = React.useState<NetworkState>(() => ({
-    online: getInitialOnlineState(),
-    lastChangedAt: new Date().toISOString(),
-  }));
+  const [state, setState] = React.useState<NetworkState>({
+    online: true,
+    lastChangedAt: "",
+  });
 
   React.useEffect(() => {
     function update() {

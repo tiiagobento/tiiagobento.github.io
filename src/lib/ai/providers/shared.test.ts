@@ -1,8 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { buildOpenAIMessageContent, extractOpenAIResponseText, parseDataUrl } from "@/lib/ai/providers/shared";
+import { buildOpenAIMessageContent, extractOpenAIResponseText, getAIRequestTimeoutMs, parseDataUrl } from "@/lib/ai/providers/shared";
 import { createMockProvider } from "@/lib/ai/providers/mock";
 
 describe("AI provider helpers", () => {
+  it("uses a bounded server-side AI timeout", () => {
+    const previous = process.env.AI_REQUEST_TIMEOUT_MS;
+    process.env.AI_REQUEST_TIMEOUT_MS = "30000";
+    expect(getAIRequestTimeoutMs()).toBe(30_000);
+
+    process.env.AI_REQUEST_TIMEOUT_MS = "1000";
+    expect(getAIRequestTimeoutMs()).toBe(30_000);
+
+    if (previous === undefined) delete process.env.AI_REQUEST_TIMEOUT_MS;
+    else process.env.AI_REQUEST_TIMEOUT_MS = previous;
+  });
+
   it("builds multimodal OpenAI-compatible content", () => {
     const content = buildOpenAIMessageContent({
       task: "extract-leads",

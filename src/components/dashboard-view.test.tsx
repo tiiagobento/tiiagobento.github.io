@@ -18,6 +18,9 @@ describe("DashboardView", () => {
     );
 
     expect(screen.getByText("Total de leads")).toBeInTheDocument();
+    expect(screen.getByText("O que fazer agora")).toBeInTheDocument();
+    expect(screen.getByText("Meu dia")).toBeInTheDocument();
+    expect(screen.getByText("Nova Forma IA")).toBeInTheDocument();
     expect(screen.getAllByText("3")[0]).toBeInTheDocument();
     expect(screen.getByText("Leads quentes")).toBeInTheDocument();
     expect(screen.getAllByText("Tarefas atrasadas").length).toBeGreaterThan(0);
@@ -36,6 +39,7 @@ describe("DashboardView", () => {
     render(<DashboardView leads={[]} interactions={[]} tasks={[]} />);
 
     expect(screen.getByText("Dashboard pronto para receber dados")).toBeInTheDocument();
+    expect(screen.getByText("O que fazer agora")).toBeInTheDocument();
     expect(screen.getByText(/Cadastre o primeiro lead/i)).toBeInTheDocument();
   });
 });

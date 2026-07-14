@@ -12,10 +12,9 @@ vi.mock("sonner", () => ({
 
 describe("TemplateCard", () => {
   beforeEach(() => {
-    Object.assign(navigator, {
-      clipboard: {
-        writeText: vi.fn().mockResolvedValue(undefined),
-      },
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: vi.fn().mockResolvedValue(undefined) },
     });
   });
 

@@ -39,6 +39,7 @@ import {
 import { format, isAfter, isBefore, isToday, parseISO, startOfToday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { EmptyState } from "@/components/empty-state";
+import { DailyExecutionAssistant, type DailyExecutionHandlers } from "@/components/daily-execution-assistant";
 import { LeadPriorityBadge, LeadScoreBadge, LeadStatusBadge } from "@/components/lead-badges";
 import { MetricCard } from "@/components/metric-card";
 import { Button } from "@/components/ui/button";
@@ -47,20 +48,52 @@ import { Separator } from "@/components/ui/separator";
 import { daysSinceLastContact, isStaleLead } from "@/lib/business";
 import { pipelineStatuses } from "@/lib/constants";
 import { cn, formatCurrency } from "@/lib/utils";
-import type { Interaction, Lead, Task } from "@/lib/types";
+import type { AutomationLevel } from "@/lib/automation-preferences";
+import type { Interaction, Lead, MessageTemplate, Task } from "@/lib/types";
 
 const chartColors = ["#12323b", "#b7793c", "#257365", "#81909a", "#d7a45c", "#a45537", "#4e646f", "#6f5d4e"];
 
-export function DashboardView({ leads, interactions, tasks }: { leads: Lead[]; interactions: Interaction[]; tasks: Task[] }) {
+export function DashboardView({
+  leads,
+  interactions,
+  tasks,
+  templates = [],
+  profileName,
+  isOnline = true,
+  automationLevel = "semi-automatic",
+  handlers,
+}: {
+  leads: Lead[];
+  interactions: Interaction[];
+  tasks: Task[];
+  templates?: MessageTemplate[];
+  profileName?: string | null;
+  isOnline?: boolean;
+  automationLevel?: AutomationLevel;
+  handlers?: DailyExecutionHandlers;
+}) {
   const [showMoreMetrics, setShowMoreMetrics] = React.useState(false);
 
   if (!leads.length && !tasks.length) {
     return (
-      <EmptyState
-        icon={Inbox}
-        title="Dashboard pronto para receber dados"
-        description="Cadastre o primeiro lead ou importe uma lista para acompanhar origem, funil, prioridades e proximas acoes com dados reais do Supabase."
-      />
+      <div className="space-y-5">
+        <DashboardGreeting profileName={profileName} leads={leads} tasks={tasks} />
+        <DailyExecutionAssistant
+          leads={leads}
+          interactions={interactions}
+          tasks={tasks}
+          templates={templates}
+          profileName={profileName}
+          isOnline={isOnline}
+          automationLevel={automationLevel}
+          handlers={handlers}
+        />
+        <EmptyState
+          icon={Inbox}
+          title="Dashboard pronto para receber dados"
+          description="Cadastre o primeiro lead ou importe uma lista para acompanhar origem, funil, prioridades e proximas acoes com dados reais do Supabase."
+        />
+      </div>
     );
   }
 
@@ -96,40 +129,18 @@ export function DashboardView({ leads, interactions, tasks }: { leads: Lead[]; i
 
   return (
     <div className="space-y-5">
-      <section className="overflow-hidden rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/10">
-        <div className="relative p-5 sm:p-6">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(184,117,53,0.22),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.08),transparent_46%)]" />
-          <div className="relative flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/55">Painel comercial</p>
-              <h1 className="mt-2 text-2xl font-semibold sm:text-3xl">Priorize visitas, orcamentos e retomadas com dados reais.</h1>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-white/70">
-                Acompanhe leads quentes, tarefas atrasadas e oportunidades por etapa para decidir o proximo contato sem depender de planilhas.
-              </p>
-            </div>
-            <div className="grid gap-2 sm:flex sm:flex-wrap xl:justify-end">
-              <Button asChild variant="accent" className="min-h-12 sm:min-h-10">
-                <Link href="/leads/new">
-                  <Plus className="size-4" />
-                  Novo lead
-                </Link>
-              </Button>
-              <Button asChild variant="secondary" className="min-h-12 sm:min-h-10">
-                <Link href="/leads/ai-import">
-                  <Sparkles className="size-4" />
-                  Importar com IA
-                </Link>
-              </Button>
-              <Button asChild variant="outline" className="min-h-12 border-white/20 bg-white/8 text-white hover:bg-white/14 sm:min-h-10">
-                <Link href="/pipeline">
-                  <ListChecks className="size-4" />
-                  Pipeline
-                </Link>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </section>
+      <DashboardGreeting profileName={profileName} leads={leads} tasks={tasks} />
+
+      <DailyExecutionAssistant
+        leads={leads}
+        interactions={interactions}
+        tasks={tasks}
+        templates={templates}
+        profileName={profileName}
+        isOnline={isOnline}
+        automationLevel={automationLevel}
+        handlers={handlers}
+      />
 
       <section className="grid gap-2 rounded-xl border bg-card/90 p-3 shadow-sm sm:flex sm:flex-wrap sm:items-center">
         <Button asChild variant="outline" className="min-h-12 sm:min-h-10">
@@ -287,6 +298,43 @@ export function DashboardView({ leads, interactions, tasks }: { leads: Lead[]; i
         />
       </section>
     </div>
+  );
+}
+
+function DashboardGreeting({ profileName, leads, tasks }: { profileName?: string | null; leads: Lead[]; tasks: Task[] }) {
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite";
+  const firstName = profileName?.trim().split(" ")[0] || "Tiago";
+  const openTasks = tasks.filter((task) => task.status !== "concluida").length;
+  const hotLeads = leads.filter((lead) => lead.lead_score >= 70 && !["Fechado", "Perdido"].includes(lead.status)).length;
+
+  return (
+    <section className="page-hero">
+      <div className="relative p-5 sm:p-6">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase text-white/55">{format(new Date(), "EEEE, dd 'de' MMMM", { locale: ptBR })}</p>
+            <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">{greeting}, {firstName}. Seu plano comercial esta pronto.</h1>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-white/70">
+              {openTasks || hotLeads
+                ? `${openTasks} tarefas abertas e ${hotLeads} leads quentes foram organizados por horario, atraso e oportunidade.`
+                : "Nao ha urgencias comerciais agora. O CRM continua acompanhando novos leads e prazos."}
+            </p>
+          </div>
+          <div className="grid gap-2 sm:flex sm:flex-wrap xl:justify-end">
+            <Button asChild variant="accent" className="min-h-12 sm:min-h-10">
+              <Link href="/leads/new"><Plus className="size-4" />Novo lead</Link>
+            </Button>
+            <Button asChild variant="secondary" className="min-h-12 sm:min-h-10">
+              <Link href="/leads/ai-import"><Sparkles className="size-4" />Importar com IA</Link>
+            </Button>
+            <Button asChild variant="outline" className="min-h-12 border-white/20 bg-white/8 text-white hover:bg-white/14 sm:min-h-10">
+              <Link href="/pipeline"><ListChecks className="size-4" />Pipeline</Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 

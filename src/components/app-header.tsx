@@ -55,7 +55,7 @@ export function AppHeader() {
         </div>
         <div className="flex items-center gap-2">
           <OfflineStatus compact />
-          <Button variant="outline" size="icon" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label="Alternar tema">
+          <Button variant="outline" size="icon" className="size-11 min-h-11 min-w-11" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label="Alternar tema">
             <Sun className="size-4 dark:hidden" />
             <Moon className="hidden size-4 dark:block" />
           </Button>
@@ -99,7 +99,7 @@ function MobileNavigation({
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button type="button" variant="outline" size="icon" className="shrink-0 lg:hidden" aria-label="Abrir menu">
+        <Button type="button" variant="outline" size="icon" className="size-11 min-h-11 min-w-11 shrink-0 lg:hidden" aria-label="Abrir menu">
           <Menu className="size-5" />
         </Button>
       </DialogTrigger>

@@ -136,6 +136,7 @@ Configure um provider em `.env.local`:
 ```env
 AI_PROVIDER=gemini
 GEMINI_API_KEY=sua-chave-secreta
+AI_REQUEST_TIMEOUT_MS=30000
 ```
 
 Valores aceitos em `AI_PROVIDER`: `gemini`, `groq`, `openrouter`, `huggingface` e `mock`. Use `mock` sem chave para desenvolvimento. Se o provider escolhido nao tiver chave, a API retorna uma mensagem amigavel e nao fica em loading infinito.

@@ -23,6 +23,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=SUA_ANON_PUBLIC_KEY
 
 AI_PROVIDER=gemini
 GEMINI_API_KEY=SUA_CHAVE_SECRETA
+AI_REQUEST_TIMEOUT_MS=30000
 ```
 
 Opcionalmente, projetos Supabase novos podem mostrar uma chave publicavel com outro nome. A aplicacao tambem aceita:
@@ -234,6 +235,8 @@ GROQ_API_KEY=
 OPENROUTER_API_KEY=
 HUGGINGFACE_API_KEY=
 ```
+
+`AI_REQUEST_TIMEOUT_MS=30000` define o limite server-side das chamadas ao provider. A chave continua somente no backend.
 
 Providers aceitos:
 

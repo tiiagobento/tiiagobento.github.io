@@ -183,13 +183,17 @@ describe("useCrmData CRUD", () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     await act(async () => {
-      await result.current.addInteraction("lead-1", {
-        interaction_type: "WhatsApp",
-        responsible: "Tiago",
-        description: "Cliente pediu retorno com proposta.",
-        next_step: "Enviar proposta",
-        next_contact_at: "2026-07-10T13:00:00.000Z",
-      });
+      await result.current.addInteraction(
+        "lead-1",
+        {
+          interaction_type: "WhatsApp",
+          responsible: "Tiago",
+          description: "Cliente pediu retorno com proposta.",
+          next_step: "Enviar proposta",
+          next_contact_at: "2026-07-10T13:00:00.000Z",
+        },
+        { status: "Orcamento a enviar" },
+      );
     });
 
     expect(db.interactions[0]).toMatchObject({ lead_id: "lead-1", description: "Cliente pediu retorno com proposta." });
@@ -197,7 +201,7 @@ describe("useCrmData CRUD", () => {
     expect(db.updates[0]).toMatchObject({
       table: "leads",
       id: "lead-1",
-      payload: expect.objectContaining({ next_action_at: "2026-07-10T13:00:00.000Z" }),
+      payload: expect.objectContaining({ next_action_at: "2026-07-10T13:00:00.000Z", status: "Orcamento a enviar" }),
     });
   });
 });

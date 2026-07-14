@@ -1,7 +1,9 @@
 import { imagePayloadToDataUrl } from "@/lib/ai/image-utils";
 import type { AIProviderRequest } from "@/lib/ai/provider-types";
 
-const DEFAULT_TIMEOUT_MS = 60_000;
+const DEFAULT_TIMEOUT_MS = 30_000;
+const MIN_TIMEOUT_MS = 5_000;
+const MAX_TIMEOUT_MS = 120_000;
 export const UNSUPPORTED_IMAGE_PROVIDER_MESSAGE = "O provider atual nao suporta analise de imagem. Use Gemini ou Puter para analisar prints.";
 
 export class AIProviderRequestError extends Error {
@@ -14,7 +16,15 @@ export class AIProviderRequestError extends Error {
   }
 }
 
-export async function requestProviderJson(url: string, init: RequestInit, timeoutMs = DEFAULT_TIMEOUT_MS) {
+export function getAIRequestTimeoutMs() {
+  const configured = Number.parseInt(process.env.AI_REQUEST_TIMEOUT_MS ?? "", 10);
+  if (Number.isFinite(configured) && configured >= MIN_TIMEOUT_MS && configured <= MAX_TIMEOUT_MS) {
+    return configured;
+  }
+  return DEFAULT_TIMEOUT_MS;
+}
+
+export async function requestProviderJson(url: string, init: RequestInit, timeoutMs = getAIRequestTimeoutMs()) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 

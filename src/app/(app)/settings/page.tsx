@@ -1,15 +1,19 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Cloud, CloudOff, Database, RefreshCw, ShieldCheck, Trash2, TriangleAlert } from "lucide-react";
+import { Bot, Check, Cloud, CloudOff, Database, RefreshCw, ShieldCheck, Trash2, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAutomationLevel } from "@/hooks/use-automation-level";
 import { useCrmData } from "@/hooks/use-crm-data";
+import { automationLevelOptions } from "@/lib/automation-preferences";
 import { discardPendingOperation } from "@/lib/offline/sync-queue";
+import { cn } from "@/lib/utils";
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { configurationError, userEmail, signOut, isOnline, syncing, syncSummary, syncNow, retrySync, refresh } = useCrmData();
+  const { configurationError, userEmail, currentUserId, signOut, isOnline, syncing, syncSummary, syncNow, retrySync, refresh } = useCrmData();
+  const [automationLevel, setAutomationLevel] = useAutomationLevel(currentUserId);
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <Card>
@@ -46,6 +50,43 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">Execute o arquivo `supabase/schema.sql` no SQL Editor do Supabase. Para popular dados de teste no banco real, use a funcao `public.seed_nova_forma_demo` com o UUID do usuario.</p>
+        </CardContent>
+      </Card>
+      <Card className="lg:col-span-2">
+        <CardHeader>
+          <Bot className="size-6 text-accent" />
+          <CardTitle>Nivel de automacao</CardTitle>
+          <CardDescription>Defina quanto o assistente pode organizar internamente. Mensagens externas, exclusoes e decisoes sensiveis sempre exigem confirmacao.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3 lg:grid-cols-3">
+          {automationLevelOptions.map((option) => {
+            const selected = automationLevel === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => setAutomationLevel(option.value)}
+                className={cn(
+                  "relative min-h-36 rounded-xl border bg-card p-4 text-left shadow-sm transition hover:border-primary/25 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                  selected && "border-accent/55 bg-accent/5 ring-1 ring-accent/20",
+                )}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-semibold">{option.title}</p>
+                      {option.recommended ? <span className="rounded-full bg-accent/12 px-2 py-0.5 text-[10px] font-semibold text-accent">Recomendado</span> : null}
+                    </div>
+                    <p className="mt-2 text-sm leading-5 text-muted-foreground">{option.description}</p>
+                  </div>
+                  <span className={cn("flex size-7 shrink-0 items-center justify-center rounded-full border text-transparent", selected && "border-accent bg-accent text-accent-foreground")}>
+                    <Check className="size-4" />
+                  </span>
+                </div>
+              </button>
+            );
+          })}
         </CardContent>
       </Card>
       <Card className="lg:col-span-2">
