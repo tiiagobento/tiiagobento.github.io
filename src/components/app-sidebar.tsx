@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { BarChart3 } from "lucide-react";
 import { getVisibleNavigationItems, useActiveNavigation, useLogout, useNavigationRole } from "@/components/app-navigation";
+import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -15,13 +16,10 @@ export function AppSidebar() {
   return (
       <aside className="hidden h-screen w-72 shrink-0 border-r border-white/10 bg-primary text-primary-foreground shadow-2xl shadow-primary/20 lg:sticky lg:top-0 lg:flex lg:flex-col">
         <div className="border-b border-white/10 p-5">
-          <div className="flex items-center gap-3">
-            <div className="flex size-11 items-center justify-center rounded-xl bg-accent font-bold text-accent-foreground shadow-lg shadow-accent/25 ring-1 ring-white/15">NF</div>
-            <div>
-              <p className="text-sm text-white/60">Nova Forma</p>
-              <h1 className="text-lg font-semibold">Lead Control</h1>
-            </div>
-          </div>
+          <Link href="/dashboard" className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-primary" aria-label="Nova Forma CRM - ir para o dashboard">
+            <BrandLogo className="w-full rounded-lg shadow-lg shadow-slate-950/20" priority />
+          </Link>
+          <p className="mt-3 text-xs font-medium uppercase tracking-[0.14em] text-white/60">CRM comercial</p>
         </div>
         <nav className="flex-1 space-y-1.5 overflow-y-auto p-3.5">
           {visibleItems.map((item) => {

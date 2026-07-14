@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
+import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -131,7 +132,7 @@ function AuthShell({ title, description, children }: { title: string; descriptio
       <Card className="grid w-full max-w-5xl overflow-hidden border-white/10 bg-white/96 shadow-2xl shadow-slate-950/30 md:grid-cols-[1fr_1.05fr] dark:border-white/10 dark:bg-card/95 dark:shadow-black/50">
         <div className="hidden bg-primary p-8 text-primary-foreground md:flex md:flex-col md:justify-between">
           <div>
-            <div className="flex size-12 items-center justify-center rounded-xl bg-accent font-bold text-accent-foreground shadow-lg shadow-accent/20">NF</div>
+            <BrandLogo variant="complete" className="w-full max-w-sm rounded-xl shadow-xl shadow-slate-950/20" priority />
             <h1 className="mt-6 text-3xl font-semibold">Nova Forma CRM</h1>
             <p className="mt-3 max-w-sm text-sm leading-6 text-white/68">Controle comercial para leads, visitas, orcamentos e follow-ups em steel frame.</p>
           </div>
@@ -139,7 +140,7 @@ function AuthShell({ title, description, children }: { title: string; descriptio
         </div>
         <div>
         <CardHeader className="space-y-2 p-6 sm:p-8">
-          <div className="mb-2 flex size-11 items-center justify-center rounded-xl bg-primary font-bold text-primary-foreground md:hidden">NF</div>
+          <BrandLogo className="mb-2 w-36 rounded-lg shadow-sm md:hidden" priority />
           <CardTitle className="text-2xl">{title}</CardTitle>
           <CardDescription>{description}</CardDescription>
         </CardHeader>
