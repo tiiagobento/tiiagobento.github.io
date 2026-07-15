@@ -115,6 +115,7 @@ export function DailyExecutionAssistant({
   const [message, setMessage] = React.useState("");
   const [generatingMessage, setGeneratingMessage] = React.useState(false);
   const [savingOutcome, setSavingOutcome] = React.useState(false);
+  const assistantEntrySequence = React.useRef(0);
 
   React.useEffect(() => {
     const stored = window.localStorage.getItem(dayStorageKey(todayKey));
@@ -169,6 +170,11 @@ export function DailyExecutionAssistant({
       persistDayState(next);
       return next;
     });
+  }
+
+  function nextAssistantEntryId(source: AssistantEntry["source"], mode: AssistantMode) {
+    assistantEntrySequence.current += 1;
+    return `${source}:${mode}:${assistantEntrySequence.current}`;
   }
 
   function markCompleted(action: DailyAction) {
@@ -389,7 +395,7 @@ export function DailyExecutionAssistant({
     setAssistantMode(mode);
     const fallback = buildAssistantMessage(mode, summary, currentAction, completedCount, firstName, nextStrategy);
     const localSuggestion: AssistantEntry = {
-      id: `plan:${mode}:${Date.now()}`,
+      id: nextAssistantEntryId("plan", mode),
       message: fallback,
       source: "plan",
       suggestedActionId: currentAction?.id ?? null,
@@ -437,7 +443,7 @@ export function DailyExecutionAssistant({
       const actionId = visiblePlan.some((action) => action.id === payload.suggested_action_id) ? payload.suggested_action_id ?? null : null;
       setSuggestedActionId(actionId);
       appendAssistantEntry({
-        id: `ai:${mode}:${Date.now()}`,
+        id: nextAssistantEntryId("ai", mode),
         message: payload.message.trim(),
         source: "ai",
         suggestedActionId: actionId,

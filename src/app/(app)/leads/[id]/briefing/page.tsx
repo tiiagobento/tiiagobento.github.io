@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ArrowLeft, MessageCircle, Printer, UserRound } from "lucide-react";
+import { ArrowLeft, MessageCircle, UserRound } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
+import { LeadBriefingActions } from "@/components/lead-briefing-actions";
 import { LeadPriorityBadge, LeadScoreBadge, LeadStatusBadge } from "@/components/lead-badges";
 import { LoadingSkeleton } from "@/components/loading-skeleton";
 import { Button } from "@/components/ui/button";
@@ -52,10 +53,7 @@ export default function LeadBriefingPage() {
             Voltar para o lead
           </Link>
         </Button>
-        <Button type="button" onClick={() => window.print()}>
-          <Printer className="size-4" />
-          Imprimir / salvar PDF
-        </Button>
+        <LeadBriefingActions leadId={lead.id} leadName={lead.name} />
         <Button asChild variant="accent">
           <a href={whatsappUrl || "#"} target="_blank" rel="noreferrer">
             <MessageCircle className="size-4" />
@@ -64,7 +62,7 @@ export default function LeadBriefingPage() {
         </Button>
       </div>
 
-      <Card className="overflow-hidden border-primary/10 shadow-lg print:border-0 print:shadow-none">
+      <Card id="visit-briefing-document" className="overflow-hidden border-primary/10 shadow-lg print:border-0 print:shadow-none">
         <div className="relative overflow-hidden bg-primary p-7 text-primary-foreground print:bg-white print:p-0 print:text-slate-950">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(185,120,56,0.24),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.08),transparent_42%)] print:hidden" />
           <div className="relative">
