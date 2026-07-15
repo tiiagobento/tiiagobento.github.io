@@ -61,4 +61,18 @@ describe("offline store", () => {
     expect(merged.leads).toEqual([]);
     await expect(loadCrmSnapshot(userId)).resolves.toMatchObject({ leads: [] });
   });
+
+  it("keeps a partner cache scoped to the signed-in partner while preserving the lead owner", async () => {
+    const partnerId = "partner-1";
+    const ownerId = "owner-1";
+    const partnerLead = lead({ user_id: ownerId, partner_id: partnerId });
+    const { loadCrmSnapshot, saveCrmSnapshot } = await import("@/lib/offline/offline-store");
+
+    await saveCrmSnapshot(partnerId, snapshot([partnerLead]));
+
+    await expect(loadCrmSnapshot(partnerId)).resolves.toMatchObject({
+      leads: [{ id: "lead-1", user_id: ownerId, partner_id: partnerId }],
+    });
+    await expect(loadCrmSnapshot(ownerId)).resolves.toMatchObject({ leads: [] });
+  });
 });

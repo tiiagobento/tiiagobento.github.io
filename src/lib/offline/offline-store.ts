@@ -18,8 +18,11 @@ function toLocalRecord<T extends { id: string; user_id?: string | null }>(item: 
   return {
     id: item.id,
     remote_id: item.id,
-    user_id: item.user_id ?? userId,
-    data: { ...item, user_id: item.user_id ?? userId },
+    // The IndexedDB record belongs to the authenticated device user. The
+    // payload keeps its original owner, which can be a different user for a
+    // partner-assigned lead.
+    user_id: userId,
+    data: { ...item },
     created_at: "created_at" in item && typeof item.created_at === "string" ? item.created_at : timestamp,
     updated_at: "updated_at" in item && typeof item.updated_at === "string" ? item.updated_at : timestamp,
     sync_status: status,

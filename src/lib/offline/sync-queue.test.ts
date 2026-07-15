@@ -4,10 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const supabaseMocks = vi.hoisted(() => ({
   upsert: vi.fn(),
   deleteEq: vi.fn(),
+  rpc: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/client", () => ({
   supabase: {
+    rpc: supabaseMocks.rpc,
     from: () => ({
       upsert: supabaseMocks.upsert,
       delete: () => ({
@@ -91,6 +93,42 @@ describe("offline sync queue", () => {
     });
 
     await expect(syncPendingOperations("user-1")).resolves.toEqual({ synced: 0, failed: 0 });
+    expect(supabaseMocks.upsert).not.toHaveBeenCalled();
+  });
+
+  it("syncs partner visit feedback through the restricted RPC", async () => {
+    const { enqueueOperation, syncPendingOperations } = await import("@/lib/offline/sync-queue");
+    supabaseMocks.rpc.mockResolvedValue({
+      data: {
+        id: "lead-partner-1",
+        user_id: "owner-1",
+        visit_status: "Visita realizada",
+        partner_notes: "Acesso confirmado.",
+        partner_visit_feedback: "Levantamento concluido.",
+      },
+      error: null,
+    });
+
+    await enqueueOperation({
+      entity: "leads",
+      entityId: "lead-partner-1",
+      userId: "partner-1",
+      operation: "update",
+      syncMode: "partner_visit_feedback",
+      data: {
+        visit_status: "Visita realizada",
+        partner_notes: "Acesso confirmado.",
+        partner_visit_feedback: "Levantamento concluido.",
+      },
+    });
+
+    await expect(syncPendingOperations("partner-1")).resolves.toEqual({ synced: 1, failed: 0 });
+    expect(supabaseMocks.rpc).toHaveBeenCalledWith("partner_update_visit_feedback", {
+      target_lead_id: "lead-partner-1",
+      new_visit_status: "Visita realizada",
+      new_partner_notes: "Acesso confirmado.",
+      new_partner_visit_feedback: "Levantamento concluido.",
+    });
     expect(supabaseMocks.upsert).not.toHaveBeenCalled();
   });
 });

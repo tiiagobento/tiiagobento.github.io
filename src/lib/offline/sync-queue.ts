@@ -1,4 +1,4 @@
-import { getOfflineDb, type OfflineEntity, type OfflineOperation, type PendingOperation } from "@/lib/offline/db";
+import { getOfflineDb, type OfflineEntity, type OfflineOperation, type OfflineSyncMode, type PendingOperation } from "@/lib/offline/db";
 import { putSyncedLocalRecord } from "@/lib/offline/offline-store";
 import { supabase } from "@/lib/supabase/client";
 
@@ -24,6 +24,7 @@ export async function enqueueOperation(input: {
   operation: OfflineOperation;
   data: unknown;
   remoteId?: string | null;
+  syncMode?: OfflineSyncMode;
 }) {
   const db = getOfflineDb();
   if (!db) return null;
@@ -36,6 +37,7 @@ export async function enqueueOperation(input: {
     user_id: input.userId,
     operation: input.operation,
     data: input.data,
+    sync_mode: input.syncMode,
     status: "pending",
     attempts: 0,
     created_at: timestamp,
@@ -65,6 +67,23 @@ function getTableName(entity: OfflineEntity) {
 
 async function runOperation(operation: PendingOperation) {
   if (!supabase) throw new Error("Supabase nao configurado.");
+
+  if (operation.sync_mode === "partner_visit_feedback") {
+    const data = operation.data as {
+      visit_status?: string | null;
+      partner_notes?: string | null;
+      partner_visit_feedback?: string | null;
+    };
+    const { data: updatedLead, error } = await supabase.rpc("partner_update_visit_feedback", {
+      target_lead_id: operation.remote_id ?? operation.entity_id,
+      new_visit_status: data.visit_status ?? null,
+      new_partner_notes: data.partner_notes ?? null,
+      new_partner_visit_feedback: data.partner_visit_feedback ?? null,
+    });
+    if (error) throw error;
+    return updatedLead;
+  }
+
   const table = getTableName(operation.entity);
 
   if (operation.operation === "delete") {

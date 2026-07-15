@@ -8,6 +8,17 @@ android {
     def releaseKeyAlias = System.getenv("NOVAFORMA_ANDROID_KEY_ALIAS")
     def releaseKeyPassword = System.getenv("NOVAFORMA_ANDROID_KEY_PASSWORD")
     def hasReleaseSigning = releaseKeystorePath && releaseKeystorePassword && releaseKeyAlias && releaseKeyPassword
+    def requestedReleaseBuild = gradle.startParameter.taskNames.any { taskName ->
+        taskName.toLowerCase().contains("release")
+    }
+
+    if (requestedReleaseBuild && !hasReleaseSigning) {
+        throw new GradleException(
+            "Release signing is required. Set NOVAFORMA_ANDROID_KEYSTORE_PATH, " +
+            "NOVAFORMA_ANDROID_KEYSTORE_PASSWORD, NOVAFORMA_ANDROID_KEY_ALIAS, and " +
+            "NOVAFORMA_ANDROID_KEY_PASSWORD before building a release APK."
+        )
+    }
 
     defaultConfig {
         applicationId "br.com.novaforma.crm"

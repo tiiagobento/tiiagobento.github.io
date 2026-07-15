@@ -4,6 +4,7 @@ import type { Interaction, Lead, MessageTemplate, Profile, Task } from "@/lib/ty
 export type OfflineEntity = "leads" | "tasks" | "interactions" | "message_templates";
 export type SyncStatus = "synced" | "pending" | "conflict" | "failed";
 export type OfflineOperation = "create" | "update" | "delete";
+export type OfflineSyncMode = "partner_visit_feedback";
 
 export type LocalRecord<T> = {
   id: string;
@@ -25,6 +26,7 @@ export type PendingOperation = {
   user_id: string;
   operation: OfflineOperation;
   data: unknown;
+  sync_mode?: OfflineSyncMode;
   status: Extract<SyncStatus, "pending" | "failed" | "conflict">;
   attempts: number;
   created_at: string;

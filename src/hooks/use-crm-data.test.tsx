@@ -178,7 +178,7 @@ describe("useCrmData CRUD", () => {
     expect((db.upserts.at(-1) as Lead).last_contact_at).toBeTruthy();
   });
 
-  it("creates interaction, updates lead last contact and creates follow-up task", async () => {
+  it("creates interaction and lets the Supabase trigger create its follow-up task", async () => {
     const { result } = await renderCrmHook();
     await waitFor(() => expect(result.current.loading).toBe(false));
 
@@ -197,7 +197,7 @@ describe("useCrmData CRUD", () => {
     });
 
     expect(db.interactions[0]).toMatchObject({ lead_id: "lead-1", description: "Cliente pediu retorno com proposta." });
-    expect(db.tasks[0]).toMatchObject({ lead_id: "lead-1", title: "Follow-up: Enviar proposta", status: "pendente" });
+    expect(db.tasks).toHaveLength(0);
     expect(db.updates[0]).toMatchObject({
       table: "leads",
       id: "lead-1",

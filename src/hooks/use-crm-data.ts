@@ -4,9 +4,9 @@ import * as React from "react";
 import { toast } from "sonner";
 import { addHours } from "date-fns";
 import { buildFollowUpTaskFromInteraction, normalizeLead, normalizeTask } from "@/lib/crm-records";
-import { clearOfflineDbForUser } from "@/lib/offline/db";
+import { clearOfflineDbForUser, type OfflineSyncMode } from "@/lib/offline/db";
 import { useNetworkStatus } from "@/lib/offline/network-status";
-import { loadCrmSnapshot, putLocalRecord, saveCrmSnapshot } from "@/lib/offline/offline-store";
+import { loadCrmSnapshot, putLocalRecord, putSyncedLocalRecord, saveCrmSnapshot } from "@/lib/offline/offline-store";
 import { enqueueOperation, getSyncSummary, retryFailedOperations, syncPendingOperations, type SyncSummary } from "@/lib/offline/sync-queue";
 import { interactionSchema } from "@/lib/schemas";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase/client";
@@ -81,14 +81,16 @@ export function useCrmData() {
     userId,
     operation,
     data,
+    syncMode,
   }: {
     entity: "leads" | "tasks" | "interactions" | "message_templates";
     entityId: string;
     userId: string;
     operation: "create" | "update" | "delete";
     data: unknown;
+    syncMode?: OfflineSyncMode;
   }) {
-    await enqueueOperation({ entity, entityId, userId, operation, data });
+    await enqueueOperation({ entity, entityId, userId, operation, data, syncMode });
     await putLocalRecord(entity, data as { id: string; user_id?: string | null }, userId, operation);
     await refreshSyncSummary(userId);
     toast.info("Voce esta offline. Essa acao sera sincronizada quando a conexao voltar.");
@@ -327,18 +329,13 @@ export function useCrmData() {
         }));
         await queueOfflineChange({ entity: "interactions", entityId: interaction.id, userId, operation: "create", data: interactionWithUser });
         await queueOfflineChange({ entity: "leads", entityId: leadId, userId, operation: "update", data: updatedLead });
-        if (task) await queueOfflineChange({ entity: "tasks", entityId: task.id, userId, operation: "create", data: { ...task, user_id: userId } });
+        if (task) await putSyncedLocalRecord("tasks", { ...task, user_id: userId }, userId);
         return;
       }
 
       if (!isSupabaseConfigured || !supabase) throw new Error("Supabase nao configurado.");
       const { error } = await supabase.from("interactions").insert(interactionWithUser);
       if (error) throw error;
-
-      if (task) {
-        const { error: taskError } = await supabase.from("tasks").insert({ ...task, user_id: userId });
-        if (taskError) throw taskError;
-      }
 
       const { error: leadError } = await supabase
         .from("leads")
@@ -571,7 +568,14 @@ export function useCrmData() {
       const updatedLead = lead ? { ...lead, ...input, updated_at: new Date().toISOString() } : null;
       if (!network.online && updatedLead) {
         updateLocalState((current) => ({ ...current, leads: current.leads.map((item) => (item.id === leadId ? updatedLead : item)) }));
-        await queueOfflineChange({ entity: "leads", entityId: leadId, userId, operation: "update", data: updatedLead });
+        await queueOfflineChange({
+          entity: "leads",
+          entityId: leadId,
+          userId,
+          operation: "update",
+          data: updatedLead,
+          syncMode: "partner_visit_feedback",
+        });
         return;
       }
       if (!isSupabaseConfigured || !supabase) throw new Error("Supabase nao configurado.");

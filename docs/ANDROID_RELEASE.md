@@ -52,7 +52,7 @@ $env:NOVAFORMA_ANDROID_KEY_ALIAS="nova-forma-crm"
 $env:NOVAFORMA_ANDROID_KEY_PASSWORD="SUA_SENHA_DA_CHAVE"
 ```
 
-Essas variaveis sao lidas por `android/app/build.gradle`. Se elas nao existirem, o release nao recebe assinatura local.
+Essas variaveis sao lidas por `android/app/build.gradle`. Se alguma estiver ausente, `npm run android:release` falha antes de gerar um APK unsigned; configure todas antes de tentar a release.
 
 ## Gerar APK release
 
