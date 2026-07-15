@@ -4,7 +4,7 @@ import { buildPuterLeadPrompt } from "@/lib/ai/puter-lead-prompt";
 import { parseAIJsonResponse } from "@/lib/ai/parse-ai-json";
 import { AIConfigurationError, getConfiguredAIProvider } from "@/lib/ai/provider";
 import { AIProviderRequestError } from "@/lib/ai/providers/shared";
-import { AI_ACCEPTED_IMAGE_TYPES, AI_IMAGE_MAX_BYTES, AI_IMAGE_MAX_COUNT, dataUrlToGeminiInlineData, estimateBase64Bytes, normalizeBase64 } from "@/lib/ai/image-utils";
+import { AI_ACCEPTED_IMAGE_TYPES, AI_IMAGE_MAX_BYTES, AI_IMAGE_MAX_COUNT, dataUrlToGeminiInlineData, estimateBase64Bytes, normalizeBase64, normalizeImageMimeType } from "@/lib/ai/image-utils";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { aiLeadAnalysisSchema } from "@/lib/validations/ai-lead-draft";
 import type { AIImageInput } from "@/lib/ai/provider-types";
@@ -21,7 +21,7 @@ const imagePayloadSchema = z.preprocess((value) => {
   }
   return value;
 }, z.object({
-  mimeType: z.string().transform((value) => value.toLowerCase()),
+  mimeType: z.string().transform(normalizeImageMimeType),
   data: z.string().min(1).transform(normalizeBase64),
 }).superRefine((value, ctx) => {
   if (!AI_ACCEPTED_IMAGE_TYPES.has(value.mimeType)) {

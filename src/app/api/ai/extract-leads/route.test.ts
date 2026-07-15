@@ -86,6 +86,19 @@ describe("POST /api/ai/extract-leads", () => {
     }));
   });
 
+  it("normalizes JPG image payloads before calling the provider", async () => {
+    const response = await POST(jsonRequest({
+      conversation: "Cliente enviou um print.",
+      source: "WhatsApp",
+      images: [{ mimeType: "image/jpg", data: "YWJj" }],
+    }));
+
+    expect(response.status).toBe(200);
+    expect(providerMocks.generate).toHaveBeenCalledWith(expect.objectContaining({
+      images: [{ mimeType: "image/jpeg", data: "YWJj" }],
+    }));
+  });
+
   it("blocks request without text and without image", async () => {
     const response = await POST(jsonRequest({
       conversation: "",

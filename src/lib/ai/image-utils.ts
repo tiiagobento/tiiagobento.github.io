@@ -14,8 +14,13 @@ export const AI_ACCEPTED_IMAGE_TYPES = new Set([
   "image/webp",
 ]);
 
+export function normalizeImageMimeType(value: string) {
+  const normalized = value.trim().toLowerCase();
+  return normalized === "image/jpg" ? "image/jpeg" : normalized;
+}
+
 export function validateImageFile(file: File) {
-  if (!AI_ACCEPTED_IMAGE_TYPES.has(file.type)) {
+  if (!AI_ACCEPTED_IMAGE_TYPES.has(normalizeImageMimeType(file.type))) {
     return "Envie apenas imagens PNG, JPG, JPEG ou WEBP.";
   }
 
@@ -48,7 +53,7 @@ export function fileToDataUrl(file: File): Promise<string> {
 export function getMimeTypeFromDataUrl(dataUrl: string) {
   const match = dataUrl.match(/^data:([^;,]+);base64,/i);
   if (!match) throw new Error("Imagem em formato invalido.");
-  return match[1].toLowerCase();
+  return normalizeImageMimeType(match[1]);
 }
 
 export function dataUrlToBase64(dataUrl: string) {
@@ -61,13 +66,13 @@ export function dataUrlToGeminiInlineData(dataUrl: string): AIImageInput {
   const match = dataUrl.match(/^data:([^;,]+);base64,([\s\S]+)$/i);
   if (!match) throw new Error("Imagem em formato invalido.");
   return {
-    mimeType: match[1].toLowerCase(),
+    mimeType: normalizeImageMimeType(match[1]),
     data: dataUrlToBase64(dataUrl),
   };
 }
 
 export function imagePayloadToDataUrl(image: AIImageInput) {
-  return `data:${image.mimeType};base64,${image.data}`;
+  return `data:${normalizeImageMimeType(image.mimeType)};base64,${image.data}`;
 }
 
 export function estimateBase64Bytes(base64: string) {

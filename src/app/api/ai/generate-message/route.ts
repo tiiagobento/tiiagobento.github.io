@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { parseAIJsonResponse } from "@/lib/ai/parse-ai-json";
 import { AIConfigurationError, getConfiguredAIProvider } from "@/lib/ai/provider";
-import { AI_REPLY_IMAGE_TOTAL_MAX_BYTES, AI_REPLY_IMAGE_TOTAL_SIZE_MESSAGE, estimateBase64Bytes } from "@/lib/ai/image-utils";
+import { AI_REPLY_IMAGE_TOTAL_MAX_BYTES, AI_REPLY_IMAGE_TOTAL_SIZE_MESSAGE, estimateBase64Bytes, normalizeImageMimeType } from "@/lib/ai/image-utils";
 import { AIProviderRequestError, UNSUPPORTED_IMAGE_PROVIDER_MESSAGE } from "@/lib/ai/providers/shared";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -14,7 +14,7 @@ const requestSchema = z.object({
   tone: z.enum(["profissional", "cordial", "direto"]).optional().default("profissional"),
   lead: z.record(z.string(), z.unknown()).optional().default({}),
   images: z.array(z.object({
-    mimeType: z.enum(["image/png", "image/jpeg", "image/jpg", "image/webp"]),
+    mimeType: z.enum(["image/png", "image/jpeg", "image/jpg", "image/webp"]).transform(normalizeImageMimeType),
     data: z.string().min(1).max(8_000_000),
   })).max(3).optional().default([]),
 }).refine(

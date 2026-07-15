@@ -6,6 +6,7 @@ import {
   estimateBase64Bytes,
   getMimeTypeFromDataUrl,
   imagePayloadToDataUrl,
+  normalizeImageMimeType,
   validateImageFile,
 } from "@/lib/ai/image-utils";
 
@@ -35,6 +36,11 @@ describe("AI image utils", () => {
     const file = new File([new Uint8Array(AI_IMAGE_MAX_BYTES + 1)], "large.png", { type: "image/png" });
 
     expect(validateImageFile(file)).toBe("Cada imagem pode ter no maximo 5 MB.");
+  });
+
+  it("normalizes the nonstandard JPG mime type for provider compatibility", () => {
+    expect(normalizeImageMimeType("image/jpg")).toBe("image/jpeg");
+    expect(dataUrlToGeminiInlineData("data:image/jpg;base64,YWJj")).toEqual({ mimeType: "image/jpeg", data: "YWJj" });
   });
 
   it("estimates base64 size", () => {
