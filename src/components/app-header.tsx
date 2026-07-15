@@ -60,9 +60,9 @@ export function AppHeader() {
             <Moon className="hidden size-4 dark:block" />
           </Button>
           <Button asChild variant="outline" className="hidden lg:inline-flex">
-            <Link href="/leads/ai-import">
+            <Link href="/dashboard#nova-forma-ia">
               <Sparkles className="size-4" />
-              IA
+              Assistente
             </Link>
           </Button>
           <Button asChild className="hidden sm:inline-flex">

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ClipboardList, Columns3, FileUp, LayoutDashboard, LogOut, MessageSquareText, Plus, Settings, Sparkles, UserCheck, Users } from "lucide-react";
 import { clearOfflineDbForUser } from "@/lib/offline/db";
+import { clearPrivateRuntimeCache } from "@/lib/offline/pwa-cache";
 import { supabase } from "@/lib/supabase/client";
 import type { ProfileRole } from "@/lib/types";
 
@@ -71,6 +72,7 @@ export function useLogout() {
       if (data.session?.user.id) {
         await clearOfflineDbForUser(data.session.user.id);
       }
+      clearPrivateRuntimeCache();
       toast.success("Voce saiu da conta.");
       router.replace("/login");
       router.refresh();

@@ -38,6 +38,10 @@ vi.mock("@/lib/offline/db", () => ({
   getOfflineDb: vi.fn(() => null),
 }));
 
+vi.mock("@/lib/offline/pwa-cache", () => ({
+  clearPrivateRuntimeCache: vi.fn(),
+}));
+
 vi.mock("@/lib/supabase/client", () => ({
   supabase: {
     auth: {

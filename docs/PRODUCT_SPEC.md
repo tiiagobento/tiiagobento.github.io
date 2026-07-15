@@ -171,7 +171,7 @@ Dentro da mesma categoria, o motor considera prioridade, score, tempo sem contat
 
 ### Nova Forma IA
 
-O assistente oferece atalhos para comecar/encerrar o dia, mostrar prioridades, preparar WhatsApp, revisar atrasos e identificar leads que precisam de atencao. As explicacoes do plano sao derivadas dos dados locais. Quando o usuario pede uma mensagem, a rota autenticada `/api/ai/generate-message` personaliza o texto no servidor. Se o provider falhar, demorar ou estiver indisponivel, o CRM mantem um template local editavel.
+O assistente oferece atalhos para comecar/encerrar o dia, mostrar prioridades, preparar WhatsApp, revisar atrasos, reorganizar a fila e identificar leads que precisam de atencao. A conversa mostra cards acionaveis do lead, contexto real e campos comerciais que ainda precisam de confirmacao. A rota autenticada `/api/ai/daily-assistant` usa o provider server-side para explicar a proxima decisao em JSON validado; ela so pode recomendar acoes que ja existem no plano. Quando o provider falhar, demorar ou estiver indisponivel, o CRM mantem a ordenacao deterministica e um template local editavel.
 
 ### Fluxo de WhatsApp
 

@@ -1,5 +1,5 @@
 export type AIProviderName = "gemini" | "groq" | "openrouter" | "huggingface" | "mock";
-export type AITask = "extract-leads" | "generate-message";
+export type AITask = "extract-leads" | "generate-message" | "daily-assistant";
 
 export type AIImageInput = {
   mimeType: string;

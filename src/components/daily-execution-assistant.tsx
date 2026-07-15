@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { addDays, addHours, format, isToday, parseISO, set } from "date-fns";
+import { addDays, addHours, differenceInMinutes, format, isToday, parseISO, set } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   AlertTriangle,
@@ -41,6 +41,7 @@ import {
 } from "@/lib/daily-plan";
 import { getTemplatesWithDefaults } from "@/lib/default-message-templates";
 import type { AutomationLevel } from "@/lib/automation-preferences";
+import type { DailyAssistantMode } from "@/lib/validations/daily-assistant";
 import { cn } from "@/lib/utils";
 import type { Interaction, Lead, MessageTemplate, Task } from "@/lib/types";
 
@@ -66,8 +67,17 @@ type Props = {
   handlers?: DailyExecutionHandlers;
 };
 
-type AssistantMode = "welcome" | "start" | "priorities" | "overdue" | "attention" | "reorganized" | "end";
+type AssistantMode = DailyAssistantMode;
 type WhatsAppStep = "preview" | "result" | "reply-result";
+
+type AssistantEntry = {
+  id: string;
+  message: string;
+  source: "ai" | "plan";
+  suggestedActionId: string | null;
+  missingInformation: string[];
+  suggestedQuestion: string | null;
+};
 
 type DayExecutionState = {
   date: string;
@@ -94,6 +104,9 @@ export function DailyExecutionAssistant({
   const [dayState, setDayState] = React.useState<DayExecutionState>(() => emptyDayState(todayKey));
   const [assistantExpanded, setAssistantExpanded] = React.useState(true);
   const [assistantMode, setAssistantMode] = React.useState<AssistantMode>("welcome");
+  const [assistantEntries, setAssistantEntries] = React.useState<AssistantEntry[]>([]);
+  const [assistantProcessing, setAssistantProcessing] = React.useState(false);
+  const [suggestedActionId, setSuggestedActionId] = React.useState<string | null>(null);
   const [focusOpen, setFocusOpen] = React.useState(false);
   const [fullDayOpen, setFullDayOpen] = React.useState(false);
   const [deferAction, setDeferAction] = React.useState<DailyAction | null>(null);
@@ -135,6 +148,20 @@ export function DailyExecutionAssistant({
   const plannedTotal = Math.max(dayState.plannedActionIds.length, visiblePlan.length + completedCount);
   const progress = plannedTotal ? Math.min(100, Math.round((completedCount / plannedTotal) * 100)) : 0;
   const firstName = profileName?.trim().split(" ")[0] || "Tiago";
+  const assistantMessage = buildAssistantMessage(assistantMode, summary, currentAction, completedCount, firstName, strategy);
+  const recommendedAction = visiblePlan.find((action) => action.id === suggestedActionId) ?? currentAction;
+
+  React.useEffect(() => {
+    if (assistantEntries.length || !currentAction) return;
+    setAssistantEntries([{
+      id: `welcome:${currentAction.id}`,
+      message: buildAssistantMessage("welcome", summary, currentAction, completedCount, firstName, strategy),
+      source: "plan",
+      suggestedActionId: currentAction.id,
+      missingInformation: getMissingLeadFields(leads.find((lead) => lead.id === currentAction.leadId)),
+      suggestedQuestion: null,
+    }]);
+  }, [assistantEntries.length, completedCount, currentAction, firstName, leads, strategy, summary]);
 
   function updateDayState(updater: (current: DayExecutionState) => DayExecutionState) {
     setDayState((current) => {
@@ -154,7 +181,7 @@ export function DailyExecutionAssistant({
 
   function startDay() {
     updateDayState((current) => ({ ...current, startedAt: current.startedAt ?? new Date().toISOString() }));
-    setAssistantMode("start");
+    void runAssistantShortcut("start");
     if (currentAction) setFocusOpen(true);
   }
 
@@ -251,6 +278,12 @@ export function DailyExecutionAssistant({
     }
 
     const fallback = buildFallbackMessage(lead, action, templates);
+    const recentHistory = interactions
+      .filter((interaction) => interaction.lead_id === lead.id)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 3)
+      .map((interaction) => `${interaction.interaction_type}: ${interaction.description}`)
+      .join("\n");
     setWhatsAppAction(action);
     setWhatsAppStep("preview");
     setMessage(fallback);
@@ -271,7 +304,7 @@ export function DailyExecutionAssistant({
         signal: controller.signal,
         body: JSON.stringify({
           objective: action.title,
-          context: `${action.reason}\n${action.context}`,
+          context: `${action.reason}\n${action.context}${recentHistory ? `\nHistorico recente:\n${recentHistory}` : ""}`,
           tone: "cordial",
           lead: {
             name: lead.name,
@@ -346,14 +379,82 @@ export function DailyExecutionAssistant({
     }
   }
 
-  function runAssistantShortcut(mode: AssistantMode) {
+  async function runAssistantShortcut(mode: AssistantMode) {
+    const nextStrategy = mode === "reorganized"
+      ? (strategy === "priority" ? "quick-wins" : "priority")
+      : strategy;
     if (mode === "reorganized") {
-      setStrategy((current) => (current === "priority" ? "quick-wins" : "priority"));
+      setStrategy(nextStrategy);
     }
     setAssistantMode(mode);
+    const fallback = buildAssistantMessage(mode, summary, currentAction, completedCount, firstName, nextStrategy);
+    const localSuggestion: AssistantEntry = {
+      id: `plan:${mode}:${Date.now()}`,
+      message: fallback,
+      source: "plan",
+      suggestedActionId: currentAction?.id ?? null,
+      missingInformation: getMissingLeadFields(leads.find((lead) => lead.id === currentAction?.leadId)),
+      suggestedQuestion: null,
+    };
+
+    if (!isOnline) {
+      appendAssistantEntry(localSuggestion);
+      return;
+    }
+
+    setAssistantProcessing(true);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 12_000);
+    try {
+      const response = await fetch("/api/ai/daily-assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          mode,
+          profile_name: profileName ?? "",
+          actions: visiblePlan.slice(0, 12).map((action) => ({
+            id: action.id,
+            title: action.title,
+            reason: action.reason,
+            context: action.context,
+            stage: action.stage,
+            source: action.source,
+            estimated_minutes: action.estimatedMinutes,
+            score: action.score,
+            lead_name: action.leadName,
+          })),
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as {
+        message?: string;
+        suggested_action_id?: string | null;
+        missing_information?: string[];
+        suggested_question?: string | null;
+      } | null;
+      if (!response.ok || !payload?.message?.trim()) throw new Error("IA indisponivel");
+
+      const actionId = visiblePlan.some((action) => action.id === payload.suggested_action_id) ? payload.suggested_action_id ?? null : null;
+      setSuggestedActionId(actionId);
+      appendAssistantEntry({
+        id: `ai:${mode}:${Date.now()}`,
+        message: payload.message.trim(),
+        source: "ai",
+        suggestedActionId: actionId,
+        missingInformation: payload.missing_information ?? [],
+        suggestedQuestion: payload.suggested_question ?? null,
+      });
+    } catch {
+      appendAssistantEntry(localSuggestion);
+    } finally {
+      window.clearTimeout(timeout);
+      setAssistantProcessing(false);
+    }
   }
 
-  const assistantMessage = buildAssistantMessage(assistantMode, summary, currentAction, completedCount, firstName, strategy);
+  function appendAssistantEntry(entry: AssistantEntry) {
+    setAssistantEntries((current) => [...current, entry].slice(-5));
+  }
 
   return (
     <div className="space-y-5">
@@ -398,7 +499,7 @@ export function DailyExecutionAssistant({
         </div>
       </section>
 
-      <section aria-labelledby="assistant-title" className="overflow-hidden rounded-xl border bg-card shadow-sm">
+      <section id="nova-forma-ia" aria-labelledby="assistant-title" className="scroll-mt-24 overflow-hidden rounded-xl border bg-card shadow-sm">
         <div className="flex items-center justify-between gap-3 border-b bg-secondary/35 px-4 py-3 sm:px-5">
           <div className="flex min-w-0 items-center gap-3">
             <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
@@ -416,7 +517,42 @@ export function DailyExecutionAssistant({
         {assistantExpanded ? (
           <div className="grid gap-5 p-4 sm:p-5 xl:grid-cols-[1fr_1.2fr]">
             <div className="rounded-xl border border-primary/10 bg-primary px-4 py-4 text-primary-foreground shadow-sm sm:px-5">
-              <p className="text-sm leading-6 text-white/85">{assistantMessage}</p>
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <p className="text-xs font-semibold uppercase text-white/60">Orientacoes recentes</p>
+                <span className="rounded-full bg-white/10 px-2 py-1 text-[10px] font-semibold text-white/75">Dados reais do CRM</span>
+              </div>
+              <div className="space-y-3" aria-live="polite">
+                {(assistantEntries.length ? assistantEntries : [{
+                  id: "fallback",
+                  message: assistantMessage,
+                  source: "plan" as const,
+                  suggestedActionId: recommendedAction?.id ?? null,
+                  missingInformation: getMissingLeadFields(leads.find((lead) => lead.id === recommendedAction?.leadId)),
+                  suggestedQuestion: null,
+                }]).map((entry, index, entries) => {
+                  const action = visiblePlan.find((item) => item.id === entry.suggestedActionId) ?? (index === entries.length - 1 ? recommendedAction : null);
+                  const lead = leads.find((item) => item.id === action?.leadId);
+                  return (
+                    <div key={entry.id} className="rounded-xl border border-white/10 bg-white/6 p-3.5">
+                      <div className="mb-2 flex flex-wrap items-center gap-2">
+                        <span className={cn("rounded-full px-2 py-1 text-[10px] font-semibold", entry.source === "ai" ? "bg-accent text-accent-foreground" : "bg-white/12 text-white/75")}>
+                          {entry.source === "ai" ? "Sugestao da IA" : "Plano comercial"}
+                        </span>
+                        {action ? <span className="text-[11px] text-white/58">Aproximadamente {action.estimatedMinutes} min</span> : null}
+                      </div>
+                      <p className="text-sm leading-6 text-white/85">{entry.message}</p>
+                      {entry.missingInformation.length ? <p className="mt-2 text-xs leading-5 text-white/62">Confirmar: {entry.missingInformation.join(", ")}.</p> : null}
+                      {entry.suggestedQuestion ? <p className="mt-2 rounded-lg bg-white/8 px-3 py-2 text-xs leading-5 text-white/82">Pergunta sugerida: {entry.suggestedQuestion}</p> : null}
+                      {action && lead ? <AssistantLeadCard action={action} lead={lead} onPrepareWhatsApp={prepareWhatsApp} onDefer={setDeferAction} /> : null}
+                    </div>
+                  );
+                })}
+                {assistantProcessing ? (
+                  <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/6 px-3 py-2.5 text-xs text-white/72">
+                    <RefreshCw className="size-3.5 animate-spin text-accent" /> Nova Forma IA esta organizando a proxima decisao.
+                  </div>
+                ) : null}
+              </div>
               {assistantMode === "end" && visiblePlan.length ? (
                 <div className="mt-4 flex flex-wrap gap-2 border-t border-white/10 pt-3">
                   <Button type="button" variant="accent" size="sm" onClick={transferRemainingToTomorrow}>Transferir para amanha</Button>
@@ -440,17 +576,20 @@ export function DailyExecutionAssistant({
               <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Atalhos</p>
               <div className="flex flex-wrap gap-2">
                 <AssistantShortcut icon={SunMedium} label="Comecar meu dia" onClick={startDay} />
-                <AssistantShortcut icon={Sparkles} label="O que faco agora?" onClick={() => runAssistantShortcut("welcome")} />
-                <AssistantShortcut icon={ListChecks} label="Mostrar prioridades" onClick={() => runAssistantShortcut("priorities")} />
+                <AssistantShortcut icon={Sparkles} label="O que faco agora?" onClick={() => void runAssistantShortcut("welcome")} />
+                <AssistantShortcut icon={ListChecks} label="Mostrar prioridades" onClick={() => void runAssistantShortcut("priorities")} />
                 <AssistantShortcut icon={MessageCircle} label="Preparar WhatsApp" onClick={() => {
                   const action = visiblePlan.find((item) => item.primaryAction === "whatsapp");
-                  if (action) void prepareWhatsApp(action);
+                  if (action) {
+                    void runAssistantShortcut("welcome");
+                    void prepareWhatsApp(action);
+                  }
                   else toast.info("Nenhuma mensagem prioritaria neste momento.");
                 }} />
-                <AssistantShortcut icon={AlertTriangle} label="Ver atrasadas" onClick={() => runAssistantShortcut("overdue")} />
-                <AssistantShortcut icon={RefreshCw} label={strategy === "priority" ? "Reorganizar meu dia" : "Voltar a prioridade"} onClick={() => runAssistantShortcut("reorganized")} />
-                <AssistantShortcut icon={UserRoundSearch} label="Leads que precisam de atencao" onClick={() => runAssistantShortcut("attention")} />
-                <AssistantShortcut icon={MoonStar} label="Encerrar meu dia" onClick={() => runAssistantShortcut("end")} />
+                <AssistantShortcut icon={AlertTriangle} label="Ver tarefas atrasadas" onClick={() => void runAssistantShortcut("overdue")} />
+                <AssistantShortcut icon={RefreshCw} label="Reorganizar meu dia" onClick={() => void runAssistantShortcut("reorganized")} />
+                <AssistantShortcut icon={UserRoundSearch} label="Leads precisam de atencao" onClick={() => void runAssistantShortcut("attention")} />
+                <AssistantShortcut icon={MoonStar} label="Encerrar meu dia" onClick={() => void runAssistantShortcut("end")} />
               </div>
               <p className="mt-3 text-xs text-muted-foreground">
                 {automationLevel === "assisted" ? "Modo assistido: cada alteracao exige sua confirmacao." : automationLevel === "automatic" ? "Modo automatico: apenas organizacoes internas seguras sao automaticas." : "Modo semiautomatico: mensagens e resultados sempre aguardam sua confirmacao."}
@@ -598,7 +737,7 @@ export function DailyExecutionAssistant({
               </DialogHeader>
               <div className="grid gap-2">
                 <Button type="button" className="min-h-12 justify-start" disabled={savingOutcome} onClick={() => registerWhatsAppOutcome("sent")}>
-                  <Check className="size-4" /> Sim, registrar e criar follow-up
+                  <Check className="size-4" /> Sim, foi enviada
                 </Button>
                 <Button type="button" variant="outline" className="min-h-12 justify-start" disabled={savingOutcome} onClick={() => setWhatsAppStep("reply-result")}>
                   <MessageCircle className="size-4" /> Enviei e o cliente respondeu
@@ -690,6 +829,45 @@ function ActionPanel({
   );
 }
 
+function AssistantLeadCard({
+  action,
+  lead,
+  onPrepareWhatsApp,
+  onDefer,
+}: {
+  action: DailyAction;
+  lead: Lead;
+  onPrepareWhatsApp: (action: DailyAction) => Promise<void>;
+  onDefer: (action: DailyAction) => void;
+}) {
+  const hot = lead.lead_score >= 70;
+
+  return (
+    <div className="mt-3 rounded-lg border border-white/10 bg-slate-950/20 p-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-white">{lead.name}</p>
+          <p className="mt-0.5 text-xs text-white/62">{hot ? "Lead quente" : lead.status} · {lead.source}</p>
+        </div>
+        <span className="shrink-0 text-[11px] text-white/58">{leadWaitLabel(lead)}</span>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {action.primaryAction === "whatsapp" ? (
+          <Button type="button" variant="accent" size="sm" onClick={() => void onPrepareWhatsApp(action)}>
+            <MessageCircle className="size-3.5" /> Preparar WhatsApp
+          </Button>
+        ) : null}
+        <Button asChild variant="outline" size="sm" className="border-white/20 bg-white/8 text-white hover:bg-white/14">
+          <Link href={`/leads/${lead.id}`}><ExternalLink className="size-3.5" /> Ver contexto</Link>
+        </Button>
+        <Button type="button" variant="ghost" size="sm" className="text-white hover:bg-white/10 hover:text-white" onClick={() => onDefer(action)}>
+          <TimerReset className="size-3.5" /> Adiar
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function DayProgress({ completed, total, value, inverse = false }: { completed: number; total: number; value: number; inverse?: boolean }) {
   return (
     <div className="min-w-44">
@@ -753,6 +931,29 @@ function buildAssistantMessage(mode: AssistantMode, summary: ReturnType<typeof s
   if (mode === "reorganized") return strategy === "quick-wins" ? "Reorganizei tarefas de urgencia equivalente para mostrar primeiro as mais rapidas. Horarios e atrasos reais continuam protegidos no topo." : "Voltei para a ordem comercial padrao, priorizando compromissos, atrasos e risco de perder oportunidades.";
   if (mode === "end") return `Hoje voce concluiu ${completed} acoes. Permanecem ${summary.total}; nenhuma sera descartada. Voce pode reagendar agora ou deixar o CRM reorganizar a fila de amanha.`;
   return action ? `Recomendo comecar por “${action.title}”. ${action.reason} O contexto foi resumido e a execucao esta a um toque.` : `Seu plano esta em dia, ${name}. Vou continuar observando novos leads, prazos e follow-ups.`;
+}
+
+function getMissingLeadFields(lead?: Lead) {
+  if (!lead) return [];
+
+  return [
+    !lead.city && "cidade",
+    !lead.neighborhood && "bairro",
+    lead.has_land == null && "terreno",
+    lead.has_blueprint == null && "planta/projeto",
+    !lead.desired_start_time && "prazo para iniciar",
+  ].filter(Boolean).slice(0, 3) as string[];
+}
+
+function leadWaitLabel(lead: Lead) {
+  const reference = lead.last_contact_at ?? lead.created_at;
+  const minutes = Math.max(0, differenceInMinutes(new Date(), parseISO(reference)));
+  if (minutes < 60) return `Aguardando ha ${Math.max(1, minutes)} min`;
+
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `Aguardando ha ${hours} h`;
+
+  return `Sem contato ha ${Math.floor(hours / 24)} dias`;
 }
 
 function outcomeConfig(outcome: "sent" | "waiting" | "interested" | "visit" | "quote" | "lost") {

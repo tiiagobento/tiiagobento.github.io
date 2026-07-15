@@ -12,6 +12,15 @@ export function createMockProvider(): AIProvider {
         });
       }
 
+      if (input.task === "daily-assistant") {
+        return JSON.stringify({
+          message: "Comece pelo contato mais urgente. Ele tem contexto comercial suficiente para um proximo passo objetivo.",
+          suggested_action_id: null,
+          missing_information: ["bairro da obra"],
+          suggested_question: "Em qual bairro sera a obra?",
+        });
+      }
+
       return JSON.stringify({
         leads: [
           {

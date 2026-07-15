@@ -127,6 +127,7 @@ A rota `/leads/ai-import` permite colar conversa ou enviar prints para gerar ras
 - O modo `Puter no navegador` continua disponivel separadamente com `https://js.puter.com/v2/`.
 - A analise acontece somente ao clicar em `Analisar com IA`.
 - `/api/ai/generate-message` gera mensagens estruturadas para integracoes futuras do CRM.
+- O painel `Nova Forma IA` no dashboard usa `/api/ai/daily-assistant` para explicar prioridades e mostrar cards de acao; a IA so recomenda acoes reais que ja estao no plano e o CRM mantem a ordem local se ela estiver indisponivel.
 - A IA nao salva automaticamente: revise o rascunho e clique em `Salvar lead`.
 - Imagens sao convertidas no navegador, enviadas ao servidor como `mimeType` + base64, e nao sao salvas no banco.
 - Gemini e Mock aceitam prints diretamente. Groq, OpenRouter e Hugging Face so aceitam imagem quando o modelo configurado for visual; caso contrario o app mostra um erro amigavel pedindo Gemini ou Puter.
