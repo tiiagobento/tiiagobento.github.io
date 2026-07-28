@@ -3,9 +3,9 @@
 import * as React from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Check, KeyRound, Loader2, Search, ShieldCheck, UserPlus, UsersRound } from "lucide-react";
+import { Check, Link2, KeyRound, Loader2, Search, ShieldCheck, UserCheck, UserPlus, UsersRound } from "lucide-react";
 import { toast } from "sonner";
-import { accessPresets, formatPermissionOverrides, getPresetForRole, profileRoleLabel, type PermissionDefinition, type UserPermissionOverride } from "@/lib/access-control";
+import { accessPresets, buildPartnerAccountLink, formatPermissionOverrides, getEligiblePartnerAccounts, getLinkedPartnerAccounts, getPresetForRole, profileRoleLabel, type PermissionDefinition, type UserPermissionOverride } from "@/lib/access-control";
 import { supabase } from "@/lib/supabase/client";
 import type { Lead, Profile, ProfileRole } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +44,8 @@ export function AccessManagement({ profiles, leads, currentProfile, onChanged }:
   const [inviteEmail, setInviteEmail] = React.useState("");
   const [inviteName, setInviteName] = React.useState("");
   const [inviting, setInviting] = React.useState(false);
+  const [partnerAccountId, setPartnerAccountId] = React.useState("none");
+  const [linkingPartner, setLinkingPartner] = React.useState(false);
 
   const load = React.useCallback(async () => {
     if (!supabase) return;
@@ -78,10 +80,37 @@ export function AccessManagement({ profiles, leads, currentProfile, onChanged }:
   }, [load]);
 
   const selected = profiles.find((profile) => profile.id === selectedId) ?? null;
+  const eligiblePartnerAccounts = getEligiblePartnerAccounts(profiles);
+  const linkedPartnerAccounts = getLinkedPartnerAccounts(profiles);
   const filteredProfiles = profiles.filter((profile) => {
     const matchesQuery = `${profile.name ?? ""} ${profile.email ?? ""}`.toLowerCase().includes(query.toLowerCase());
     return matchesQuery && (roleFilter === "all" || profile.role === roleFilter);
   });
+
+  async function linkAccountAsPartner() {
+    if (!supabase) return;
+    const account = eligiblePartnerAccounts.find((profile) => profile.id === partnerAccountId);
+    if (!account) {
+      toast.error("Selecione uma conta ativa para vincular como parceiro.");
+      return;
+    }
+    const accountLabel = account.name || account.email || "esta conta";
+    if (!window.confirm(`Vincular ${accountLabel} como parceiro? A conta tera acesso apenas ao painel de parceiros e aos leads que forem atribuidos a ela.`)) return;
+
+    setLinkingPartner(true);
+    try {
+      const { error } = await supabase.rpc("admin_update_user_access", buildPartnerAccountLink(account));
+      if (error) throw error;
+      toast.success(`${accountLabel} foi vinculado como parceiro.`);
+      setPartnerAccountId("none");
+      await onChanged();
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel vincular a conta como parceiro.");
+    } finally {
+      setLinkingPartner(false);
+    }
+  }
 
   if (loadingDetails || canManage === null) {
     return <Card><CardContent className="flex min-h-48 items-center justify-center"><Loader2 className="size-5 animate-spin text-muted-foreground" /></CardContent></Card>;
@@ -139,6 +168,31 @@ export function AccessManagement({ profiles, leads, currentProfile, onChanged }:
             <Input aria-label="E-mail do usuario convidado" placeholder="email@empresa.com" type="email" required value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} />
             <Button disabled={inviting}>{inviting ? <Loader2 className="size-4 animate-spin" /> : <UserPlus className="size-4" />}Convidar</Button>
           </form>
+        </CardContent>
+      </Card>
+
+      <Card className="border-primary/15 bg-primary/[0.025]">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Link2 className="size-5 text-accent" />Vincular conta a parceiro</CardTitle>
+          <CardDescription>Escolha uma conta ja cadastrada. Ela passara a ver somente o painel do parceiro, as notificacoes e os leads atribuidos a ela.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <Field label="Conta cadastrada">
+              <Select value={partnerAccountId} onValueChange={setPartnerAccountId}>
+                <SelectTrigger aria-label="Conta para vincular como parceiro" className="w-full sm:min-w-80"><SelectValue placeholder="Selecione uma conta" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Selecionar conta</SelectItem>
+                  {eligiblePartnerAccounts.map((profile) => <SelectItem key={profile.id} value={profile.id}>{profile.name || "Usuario sem nome"}{profile.email ? ` - ${profile.email}` : ""}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Button type="button" disabled={linkingPartner || partnerAccountId === "none" || eligiblePartnerAccounts.length === 0} onClick={linkAccountAsPartner}>
+              {linkingPartner ? <Loader2 className="size-4 animate-spin" /> : <UserCheck className="size-4" />}Vincular parceiro
+            </Button>
+          </div>
+          {eligiblePartnerAccounts.length === 0 ? <p className="rounded-lg border border-dashed bg-background/70 p-3 text-sm text-muted-foreground">Nao ha contas ativas disponiveis. Convide ou ative uma conta para vincula-la como parceiro.</p> : null}
+          {linkedPartnerAccounts.length ? <div className="rounded-xl border bg-background/75 p-3"><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Parceiros vinculados</p><div className="flex flex-wrap gap-2">{linkedPartnerAccounts.map((profile) => <button key={profile.id} type="button" onClick={() => setSelectedId(profile.id)} className="inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1.5 text-sm transition hover:border-primary/35"><UserCheck className="size-3.5 text-accent" /><span>{profile.name || profile.email || "Parceiro"}</span><Badge variant={profile.active === false ? "danger" : "secondary"}>{profile.active === false ? "Inativo" : "Gerenciar"}</Badge></button>)}</div><p className="mt-3 text-xs text-muted-foreground">Para remover o papel de parceiro, primeiro reatribua os leads vinculados e depois use Gerenciar.</p></div> : null}
         </CardContent>
       </Card>
 

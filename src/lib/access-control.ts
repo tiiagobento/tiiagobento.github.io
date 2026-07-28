@@ -1,4 +1,4 @@
-import type { ProfileRole } from "@/lib/types";
+import type { Profile, ProfileRole } from "@/lib/types";
 
 export type AccessPreset = "admin" | "user" | "partner" | "readonly" | "custom";
 
@@ -44,4 +44,24 @@ export function formatPermissionOverrides(overrides: UserPermissionOverride[], p
     ...override,
     label: labels.get(override.permission_key) ?? override.permission_key,
   }));
+}
+
+/** Accounts that an administrator can safely turn into partners. */
+export function getEligiblePartnerAccounts(profiles: Profile[]) {
+  return profiles.filter((profile) => profile.active !== false && profile.role !== "partner");
+}
+
+export function getLinkedPartnerAccounts(profiles: Profile[]) {
+  return profiles.filter((profile) => profile.role === "partner");
+}
+
+export function buildPartnerAccountLink(profile: Profile) {
+  return {
+    target_user_id: profile.id,
+    requested_role: "partner" as const,
+    requested_active: profile.active !== false,
+    requested_name: profile.name ?? null,
+    requested_overrides: [],
+    action_reason: "Conta vinculada como parceiro pela central de acessos.",
+  };
 }
