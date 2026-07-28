@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AILeadImport } from "@/components/ai/AILeadImport";
@@ -92,6 +94,7 @@ const analysisResult = {
 describe("AILeadImport", () => {
   afterEach(() => {
     vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   it("shows friendly error when analyzing without text or image", async () => {
@@ -152,12 +155,14 @@ describe("AILeadImport", () => {
   it("shows a friendly server configuration error without hanging", async () => {
     aiMocks.analyzeLeadWithServer.mockRejectedValue(new Error("IA não configurada. Configure uma API key nas variáveis de ambiente."));
 
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     render(<AILeadImport serverAIConfigured serverProvider="groq" />);
     fireEvent.change(screen.getByPlaceholderText(/cole aqui a conversa/i), { target: { value: "Cliente pediu orçamento." } });
     fireEvent.click(screen.getByRole("button", { name: /analisar com ia/i }));
 
     expect(await screen.findByText("IA não configurada. Configure uma API key nas variáveis de ambiente.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /analisar com ia/i })).toBeEnabled();
+    consoleError.mockRestore();
   });
 
   it("loads image preview and sends data URL to analysis", async () => {

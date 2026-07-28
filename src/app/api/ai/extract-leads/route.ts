@@ -5,7 +5,7 @@ import { parseAIJsonResponse } from "@/lib/ai/parse-ai-json";
 import { AIConfigurationError, getConfiguredAIProvider } from "@/lib/ai/provider";
 import { AIProviderRequestError } from "@/lib/ai/providers/shared";
 import { AI_ACCEPTED_IMAGE_TYPES, AI_IMAGE_MAX_BYTES, AI_IMAGE_MAX_COUNT, dataUrlToGeminiInlineData, estimateBase64Bytes, normalizeBase64, normalizeImageMimeType } from "@/lib/ai/image-utils";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { authorizeServerPermission } from "@/lib/supabase/route-auth";
 import { aiLeadAnalysisSchema } from "@/lib/validations/ai-lead-draft";
 import type { AIImageInput } from "@/lib/ai/provider-types";
 
@@ -46,8 +46,13 @@ const requestSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const unauthorized = await requireAuthenticatedUser();
-  if (unauthorized) return unauthorized;
+  const authorization = await authorizeServerPermission("ai.import");
+  if (authorization.status === "unauthenticated") {
+    return NextResponse.json({ error: "Sessão inválida. Faça login novamente." }, { status: 401 });
+  }
+  if (authorization.status === "forbidden") {
+    return NextResponse.json({ error: "Sua conta não possui permissão para importar leads com IA." }, { status: 403 });
+  }
 
   const parsedRequest = requestSchema.safeParse(await request.json().catch(() => null));
   if (!parsedRequest.success) {
@@ -72,17 +77,6 @@ export async function POST(request: Request) {
   } catch (error) {
     return handleAIError(error);
   }
-}
-
-async function requireAuthenticatedUser() {
-  try {
-    const supabase = await createSupabaseServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) return null;
-  } catch {
-    // Return a generic authentication error without leaking configuration.
-  }
-  return NextResponse.json({ error: "Sessão inválida. Faça login novamente." }, { status: 401 });
 }
 
 function handleAIError(error: unknown) {

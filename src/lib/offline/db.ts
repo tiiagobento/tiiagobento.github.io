@@ -1,5 +1,5 @@
 import Dexie, { type Table } from "dexie";
-import type { Interaction, Lead, MessageTemplate, Profile, Task } from "@/lib/types";
+import type { Interaction, Lead, MessageTemplate, PartnerNotification, Profile, Task } from "@/lib/types";
 
 export type OfflineEntity = "leads" | "tasks" | "interactions" | "message_templates";
 export type SyncStatus = "synced" | "pending" | "conflict" | "failed";
@@ -38,6 +38,7 @@ export type DashboardSnapshot = {
   id: string;
   user_id: string;
   data: unknown;
+  access_signature?: string | null;
   updated_at: string;
 };
 
@@ -46,6 +47,7 @@ export type LocalLead = LocalRecord<Lead>;
 export type LocalTask = LocalRecord<Task>;
 export type LocalInteraction = LocalRecord<Interaction>;
 export type LocalTemplate = LocalRecord<MessageTemplate>;
+export type LocalPartnerNotification = LocalRecord<PartnerNotification>;
 
 class NovaFormaOfflineDb extends Dexie {
   leads!: Table<LocalLead, string>;
@@ -53,6 +55,7 @@ class NovaFormaOfflineDb extends Dexie {
   interactions!: Table<LocalInteraction, string>;
   message_templates!: Table<LocalTemplate, string>;
   profiles!: Table<LocalProfile, string>;
+  partner_notifications!: Table<LocalPartnerNotification, string>;
   dashboard_snapshots!: Table<DashboardSnapshot, string>;
   pending_operations!: Table<PendingOperation, string>;
 
@@ -66,6 +69,12 @@ class NovaFormaOfflineDb extends Dexie {
       profiles: "id, remote_id, user_id, sync_status, updated_at",
       dashboard_snapshots: "id, user_id, updated_at",
       pending_operations: "id, entity, entity_id, user_id, status, created_at",
+    });
+    this.version(2).stores({
+      partner_notifications: "id, remote_id, user_id, sync_status, created_at, data.lead_id",
+    });
+    this.version(3).stores({
+      dashboard_snapshots: "id, user_id, access_signature, updated_at",
     });
   }
 }
@@ -91,6 +100,7 @@ export async function clearOfflineDbForUser(userId: string) {
     database.interactions.where("user_id").equals(userId).delete(),
     database.message_templates.where("user_id").equals(userId).delete(),
     database.profiles.where("user_id").equals(userId).delete(),
+    database.partner_notifications.where("user_id").equals(userId).delete(),
     database.dashboard_snapshots.where("user_id").equals(userId).delete(),
     database.pending_operations.where("user_id").equals(userId).delete(),
   ]);

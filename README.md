@@ -26,8 +26,8 @@ O app exige Supabase configurado. Sem as variaveis `NEXT_PUBLIC_SUPABASE_URL` e 
 
 1. Crie um projeto no Supabase.
 2. Abra o SQL Editor.
-3. Execute todo o arquivo `supabase/schema.sql`. Esse arquivo ja inclui Auth profiles, CRM, RLS, automacoes, briefing de visita e painel do parceiro.
-4. Se o banco ja existia antes da area do parceiro, execute tambem `supabase/migrations/add_partner_briefing.sql` uma vez.
+3. Execute todo o arquivo `supabase/schema.sql`. Esse arquivo inclui Auth profiles, CRM, RLS, automacoes, briefing de visita e painel do parceiro.
+4. Em seguida execute, nesta ordem, `supabase/migrations/add_partner_briefing.sql`, `supabase/migrations/add_partner_notifications.sql` e `supabase/migrations/add_access_control.sql`. Todas sao idempotentes e nao removem leads, tarefas, interacoes ou perfis.
 5. Copie `.env.example` para `.env.local`.
 6. Preencha as variaveis:
 
@@ -38,7 +38,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=sua-chave-anon-publica
 # Compatibilidade opcional com a chave publicavel nova:
 # NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sua-chave-publicavel
 
-# Opcional e apenas backend. Nao exponha no frontend.
+# Opcional e apenas backend. Necessario somente para convites pela central Usuarios e acessos.
 # SUPABASE_SERVICE_ROLE_KEY=sua-chave-service-role
 ```
 
@@ -67,7 +67,7 @@ O SQL cria:
 - campos de parceiro/Bruno em `leads`
 - RPC segura `partner_update_visit_feedback`
 
-Todas as tabelas usam Row Level Security. Usuario comum ve e altera apenas os proprios dados. Admin com `profiles.role = 'admin'` consegue operar o CRM. Parceiro com `profiles.role = 'partner'` ve apenas leads atribuidos em `leads.partner_id` e registra retorno pela RPC segura.
+Todas as tabelas usam Row Level Security. Usuario comum ve e altera apenas os proprios dados. Admin com `profiles.role = 'admin'` consegue operar o CRM. Parceiro com `profiles.role = 'partner'` ve apenas leads atribuidos em `leads.partner_id` e registra retorno pela RPC segura. A migration de controle de acesso acrescenta conjuntos por papel, excecoes individuais, status ativo/inativo e auditoria administrativa; ela tambem impede a elevacao do proprio papel pelo frontend.
 
 Regras automatizadas no banco:
 
@@ -91,6 +91,7 @@ Regras automatizadas no banco:
 - `/templates`
 - `/import-export`
 - `/settings`
+- `/settings/users` (administradores e usuarios com permissao de gestao)
 - `/leads/ai-import`
 - `/leads/[id]/briefing`
 - `/partner`
@@ -164,7 +165,7 @@ set role = 'partner', name = 'Bruno'
 where email = 'email-do-bruno@exemplo.com';
 ```
 
-Para atribuir uma visita, edite um lead como admin e preencha parceiro, data/status da visita e observacoes. Bruno acessa `/partner`, abre o briefing e registra o retorno. O admin ve o retorno na ficha do lead.
+Para atribuir uma visita, edite um lead como admin e preencha parceiro, data/status da visita e observacoes. Bruno ou Rafael acessam `/partner`, abrem somente os briefings atribuidos a cada conta e registram o retorno. O admin ve o retorno na ficha do lead e a alteracao fica na auditoria.
 
 ## Deploy na Vercel
 

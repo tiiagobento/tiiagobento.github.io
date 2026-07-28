@@ -4,13 +4,17 @@ import { parseAIJsonResponse } from "@/lib/ai/parse-ai-json";
 import { AIConfigurationError, getConfiguredAIProvider } from "@/lib/ai/provider";
 import { AIProviderRequestError } from "@/lib/ai/providers/shared";
 import { dailyAssistantRequestSchema, dailyAssistantResponseSchema } from "@/lib/validations/daily-assistant";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { authorizeServerPermission } from "@/lib/supabase/route-auth";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  if (!(await isAuthenticated())) {
+  const authorization = await authorizeServerPermission("ai.daily_plan");
+  if (authorization.status === "unauthenticated") {
     return NextResponse.json({ error: "Sessao invalida. Faca login novamente." }, { status: 401 });
+  }
+  if (authorization.status === "forbidden") {
+    return NextResponse.json({ error: "Sua conta nao possui permissao para usar a Nova Forma IA." }, { status: 403 });
   }
 
   const parsedRequest = dailyAssistantRequestSchema.safeParse(await request.json().catch(() => null));
@@ -38,16 +42,6 @@ export async function POST(request: Request) {
     }
     const message = error instanceof Error ? error.message : "Nao foi possivel preparar a orientacao.";
     return NextResponse.json({ error: message }, { status: 502 });
-  }
-}
-
-async function isAuthenticated() {
-  try {
-    const supabase = await createSupabaseServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    return Boolean(user);
-  } catch {
-    return false;
   }
 }
 

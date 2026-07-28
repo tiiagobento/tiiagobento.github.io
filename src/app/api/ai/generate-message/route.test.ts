@@ -8,11 +8,14 @@ const providerMocks = vi.hoisted(() => ({
   supportsImages: true,
 }));
 
+const authorizationMocks = vi.hoisted(() => ({ allowed: true }));
+
 vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: vi.fn(async () => ({
     auth: {
       getUser: vi.fn(async () => ({ data: { user: { id: "user-1" } }, error: null })),
     },
+    rpc: vi.fn(async () => ({ data: authorizationMocks.allowed, error: null })),
   })),
 }));
 
@@ -44,6 +47,7 @@ describe("POST /api/ai/generate-message", () => {
   beforeEach(() => {
     providerMocks.generate.mockReset();
     providerMocks.supportsImages = true;
+    authorizationMocks.allowed = true;
     providerMocks.generate.mockResolvedValue(JSON.stringify({
       message: "Ola, Cibelle! Podemos organizar uma visita ao terreno. Qual periodo funciona melhor para voce?",
       warnings: [],
@@ -83,6 +87,17 @@ describe("POST /api/ai/generate-message", () => {
 
     expect(response.status).toBe(400);
     expect(payload.error).toBe("Cole a ultima mensagem do cliente ou envie ao menos um print.");
+    expect(providerMocks.generate).not.toHaveBeenCalled();
+  });
+
+  it("rejects a signed-in user without the AI message permission", async () => {
+    authorizationMocks.allowed = false;
+
+    const response = await POST(jsonRequest(baseRequest));
+    const payload = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(payload.error).toContain("permissão");
     expect(providerMocks.generate).not.toHaveBeenCalled();
   });
 

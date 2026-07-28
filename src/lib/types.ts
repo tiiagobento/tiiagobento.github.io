@@ -38,7 +38,7 @@ export type ProjectType =
   | "Drywall"
   | "Outro";
 
-export type ProfileRole = "admin" | "partner" | "user";
+export type ProfileRole = "admin" | "partner" | "user" | "custom";
 
 export type VisitStatus =
   | "Aguardando agendamento"
@@ -54,6 +54,8 @@ export type Profile = {
   name?: string | null;
   email?: string | null;
   role: ProfileRole;
+  active?: boolean;
+  updated_at?: string | null;
   created_at?: string | null;
 };
 
@@ -135,4 +137,22 @@ export type MessageTemplate = {
   content: string;
   created_at: string;
   updated_at: string;
+};
+
+export type PartnerNotification = {
+  id: string;
+  user_id: string;
+  lead_id?: string | null;
+  type:
+    | "visit_briefing_assigned"
+    | "visit_briefing_updated"
+    | "visit_assigned"
+    | "visit_rescheduled"
+    | "visit_status_updated"
+    | "feedback_requested"
+    | "deadline_approaching";
+  title: string;
+  body?: string | null;
+  read_at?: string | null;
+  created_at: string;
 };

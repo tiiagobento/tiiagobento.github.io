@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import "fake-indexeddb/auto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Lead } from "@/lib/types";
@@ -22,7 +24,7 @@ function lead(overrides: Partial<Lead> = {}): Lead {
 }
 
 function snapshot(leads: Lead[]) {
-  return { leads, interactions: [], tasks: [], templates: [], profiles: [] };
+  return { leads, interactions: [], tasks: [], templates: [], profiles: [], notifications: [] };
 }
 
 describe("offline store", () => {
@@ -74,5 +76,16 @@ describe("offline store", () => {
       leads: [{ id: "lead-1", user_id: ownerId, partner_id: partnerId }],
     });
     await expect(loadCrmSnapshot(ownerId)).resolves.toMatchObject({ leads: [] });
+  });
+
+  it("replaces cached records when the signed-in role changes", async () => {
+    const { accessSignature, loadCrmSnapshot, saveCrmSnapshot } = await import("@/lib/offline/offline-store");
+    const adminProfile = { id: userId, role: "admin" as const, active: true, updated_at: "2026-07-15T12:00:00.000Z" };
+    const partnerProfile = { id: userId, role: "partner" as const, active: true, updated_at: "2026-07-15T13:00:00.000Z" };
+
+    await saveCrmSnapshot(userId, snapshot([lead()]), accessSignature(adminProfile));
+    await saveCrmSnapshot(userId, snapshot([]), accessSignature(partnerProfile));
+
+    await expect(loadCrmSnapshot(userId)).resolves.toMatchObject({ leads: [] });
   });
 });

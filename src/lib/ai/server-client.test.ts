@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { analyzeLeadWithServer } from "@/lib/ai/server-client";
 

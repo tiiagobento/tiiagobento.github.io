@@ -68,7 +68,7 @@ O briefing inclui:
 - dados do cliente;
 - origem, status, prioridade e score;
 - dados da obra;
-- resumo automatico para o Bruno;
+- resumo automatico para o parceiro responsavel;
 - checklist de pontos para confirmar;
 - historico resumido de interacoes;
 - proxima acao e observacoes internas;
@@ -82,6 +82,7 @@ A rota `/partner` e protegida por login e mostra leads atribuidos ao parceiro lo
 - visitas de hoje;
 - visitas realizadas;
 - leads aguardando retorno;
+- avisos de novos briefings ou alteracoes de visita;
 - lista de leads atribuidos;
 - botoes para WhatsApp, briefing e registro de retorno.
 
@@ -97,7 +98,7 @@ O parceiro pode registrar:
 
 ### Banco e seguranca
 
-O arquivo `supabase/schema.sql` e o SQL completo para uma instalacao nova. A migracao incremental `supabase/migrations/add_partner_briefing.sql` existe para bancos que ja tinham aplicado a versao anterior sem parceiro/briefing.
+O arquivo `supabase/schema.sql` e a base SQL para uma instalacao nova. As migrations incrementais `supabase/migrations/add_partner_briefing.sql`, `supabase/migrations/add_partner_notifications.sql` e `supabase/migrations/add_access_control.sql` completam a versao atual sem excluir dados existentes.
 
 Essa camada adiciona os campos de parceiro e visita em `leads`, ajusta RLS para que admin opere o CRM e parceiro visualize apenas leads atribuidos, e cria a RPC `partner_update_visit_feedback` para atualizar somente os campos permitidos:
 
@@ -105,15 +106,23 @@ Essa camada adiciona os campos de parceiro e visita em `leads`, ajusta RLS para 
 - `partner_notes`;
 - `partner_visit_feedback`.
 
-### Como criar o usuario Bruno
+Quando um admin atribui ou altera uma visita vinculada a um parceiro, o banco cria uma notificacao interna em `partner_notifications`. A notificacao e visivel apenas ao parceiro destinatario ou ao admin, respeita RLS e leva diretamente ao briefing. Ela nao envia WhatsApp, e-mail ou qualquer comunicacao externa automaticamente.
 
-1. Crie o usuario Bruno no Supabase Auth.
+### Usuarios e acessos
+
+Administradores autorizados acessam `/settings/users` para convidar usuarios, alterar papel, ativar ou desativar acesso e aplicar excecoes individuais de permissao. As alteracoes passam pela RPC `admin_update_user_access`, preservam pelo menos um administrador ativo e geram registros em `admin_audit_log`. O navegador nunca recebe service role; o convite por e-mail so e habilitado se `SUPABASE_SERVICE_ROLE_KEY` estiver configurada exclusivamente no backend.
+
+Os papeis padrao sao `admin`, `user`, `partner` e `custom`. Parceiros visualizam somente leads, tarefas, briefings e notificacoes atribuídos ao proprio `auth.uid()`. A mudanca de papel ou revogacao limpa o cache offline daquela conta na proxima sincronizacao autenticada; operacoes pendentes revogadas continuam na fila com erro claro em vez de sincronizar silenciosamente.
+
+### Como criar parceiros
+
+1. Crie Bruno e Rafael no Supabase Auth.
 2. Depois execute no SQL Editor:
 
 ```sql
 update public.profiles
-set role = 'partner', name = 'Bruno'
-where email = 'email-do-bruno@exemplo.com';
+set role = 'partner'
+where email in ('email-do-bruno@exemplo.com', 'email-do-rafael@exemplo.com');
 ```
 
 3. Garanta que o usuario administrativo esteja com role `admin`:
@@ -128,12 +137,12 @@ where email = 'seu-email-admin@exemplo.com';
 
 1. Admin cria e qualifica um lead.
 2. Admin abre a ficha do lead.
-3. Admin atribui o lead ao Bruno, define data e status da visita.
+3. Admin atribui o lead ao Bruno ou Rafael, define data e status da visita.
 4. Admin gera o briefing em `/leads/[id]/briefing`.
-5. Bruno faz login.
-6. Bruno acessa `/partner` e ve somente leads atribuidos a ele.
-7. Bruno abre o briefing.
-8. Bruno registra retorno da visita.
+5. O parceiro recebe o aviso interno de briefing no painel.
+6. Bruno ou Rafael faz login.
+7. O parceiro acessa `/partner` e ve somente leads atribuidos a ele.
+8. O parceiro abre o briefing e registra retorno da visita.
 9. Admin volta ao lead e ve o retorno nos campos de parceiro.
 
 ## Assistente de Execucao Diaria

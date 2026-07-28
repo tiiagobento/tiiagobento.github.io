@@ -1,5 +1,5 @@
-import { getOfflineDb, type LocalRecord } from "@/lib/offline/db";
-import type { Interaction, Lead, MessageTemplate, Profile, Task } from "@/lib/types";
+import { clearOfflineDbForUser, getOfflineDb, type LocalRecord } from "@/lib/offline/db";
+import type { Interaction, Lead, MessageTemplate, PartnerNotification, Profile, Task } from "@/lib/types";
 
 export type CrmSnapshot = {
   leads: Lead[];
@@ -7,6 +7,7 @@ export type CrmSnapshot = {
   tasks: Task[];
   templates: MessageTemplate[];
   profiles: Profile[];
+  notifications: PartnerNotification[];
 };
 
 function now() {
@@ -31,7 +32,7 @@ function toLocalRecord<T extends { id: string; user_id?: string | null }>(item: 
   };
 }
 
-type SnapshotTable = "leads" | "interactions" | "tasks" | "message_templates" | "profiles";
+type SnapshotTable = "leads" | "interactions" | "tasks" | "message_templates" | "profiles" | "partner_notifications";
 
 async function mergeSnapshotTable<T extends { id: string; user_id?: string | null }>(
   tableName: SnapshotTable,
@@ -66,21 +67,33 @@ async function mergeSnapshotTable<T extends { id: string; user_id?: string | nul
     .map((record) => record.data)];
 }
 
-export async function saveCrmSnapshot(userId: string, snapshot: CrmSnapshot): Promise<CrmSnapshot> {
+export function accessSignature(profile: Profile | null) {
+  if (!profile) return "missing-profile";
+  return [profile.id, profile.role, profile.active === false ? "inactive" : "active", profile.updated_at ?? "unknown"].join(":");
+}
+
+export async function saveCrmSnapshot(userId: string, snapshot: CrmSnapshot, currentAccessSignature?: string): Promise<CrmSnapshot> {
   const db = getOfflineDb();
   if (!db) return snapshot;
 
-  await db.transaction("rw", [db.leads, db.interactions, db.tasks, db.message_templates, db.profiles, db.dashboard_snapshots], async () => {
-    const [leads, interactions, tasks, templates, profiles] = await Promise.all([
+  const snapshotId = `dashboard:${userId}`;
+  const existingSnapshot = await db.dashboard_snapshots.get(snapshotId);
+  if (currentAccessSignature && existingSnapshot?.access_signature && existingSnapshot.access_signature !== currentAccessSignature) {
+    await clearOfflineDbForUser(userId);
+  }
+
+  await db.transaction("rw", [db.leads, db.interactions, db.tasks, db.message_templates, db.profiles, db.partner_notifications, db.dashboard_snapshots], async () => {
+    const [leads, interactions, tasks, templates, profiles, notifications] = await Promise.all([
       mergeSnapshotTable("leads", userId, snapshot.leads),
       mergeSnapshotTable("interactions", userId, snapshot.interactions),
       mergeSnapshotTable("tasks", userId, snapshot.tasks),
       mergeSnapshotTable("message_templates", userId, snapshot.templates),
       mergeSnapshotTable("profiles", userId, snapshot.profiles),
+      mergeSnapshotTable("partner_notifications", userId, snapshot.notifications),
     ]);
 
-    const mergedSnapshot = { leads, interactions, tasks, templates, profiles } as CrmSnapshot;
-    await db.dashboard_snapshots.put({ id: `dashboard:${userId}`, user_id: userId, data: mergedSnapshot, updated_at: now() });
+    const mergedSnapshot = { leads, interactions, tasks, templates, profiles, notifications } as CrmSnapshot;
+    await db.dashboard_snapshots.put({ id: snapshotId, user_id: userId, data: mergedSnapshot, access_signature: currentAccessSignature ?? null, updated_at: now() });
   });
 
   return loadCrmSnapshot(userId).then((localSnapshot) => localSnapshot ?? snapshot);
@@ -90,12 +103,13 @@ export async function loadCrmSnapshot(userId: string): Promise<CrmSnapshot | nul
   const db = getOfflineDb();
   if (!db) return null;
 
-  const [leads, interactions, tasks, templates, profiles] = await Promise.all([
+  const [leads, interactions, tasks, templates, profiles, notifications] = await Promise.all([
     db.leads.where("user_id").equals(userId).toArray(),
     db.interactions.where("user_id").equals(userId).toArray(),
     db.tasks.where("user_id").equals(userId).toArray(),
     db.message_templates.where("user_id").equals(userId).toArray(),
     db.profiles.where("user_id").equals(userId).toArray(),
+    db.partner_notifications.where("user_id").equals(userId).toArray(),
   ]);
 
   return {
@@ -104,6 +118,7 @@ export async function loadCrmSnapshot(userId: string): Promise<CrmSnapshot | nul
     tasks: tasks.filter((item) => item.operation !== "delete").map((item) => item.data),
     templates: templates.filter((item) => item.operation !== "delete").map((item) => item.data),
     profiles: profiles.filter((item) => item.operation !== "delete").map((item) => item.data),
+    notifications: notifications.filter((item) => item.operation !== "delete").map((item) => item.data),
   };
 }
 

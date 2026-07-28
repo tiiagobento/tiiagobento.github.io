@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import LoginPage from "@/app/(auth)/login/page";
@@ -18,6 +20,10 @@ const supabaseMocks = vi.hoisted(() => ({
 
 vi.mock("next/navigation", () => ({
   useRouter: () => routerMocks,
+}));
+
+vi.mock("next/image", () => ({
+  default: () => null,
 }));
 
 vi.mock("sonner", () => ({

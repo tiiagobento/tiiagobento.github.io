@@ -46,7 +46,8 @@ export function MobileBottomNav() {
   const [open, setOpen] = React.useState(false);
   const partnerOnly = role === "partner";
   const mainItems = partnerOnly ? [{ href: "/partner", label: "Parceiro", icon: UserCheck }] : primaryItems;
-  const moreActive = moreItems.some((item) => isNavigationItemActive(pathname, item.href));
+  const permittedMoreItems = partnerOnly ? [{ href: "/settings", label: "Conta", icon: Settings }] : moreItems;
+  const moreActive = permittedMoreItems.some((item) => isNavigationItemActive(pathname, item.href));
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border/80 bg-card/94 px-2 pt-2 shadow-[0_-18px_38px_-30px_rgb(15_23_42/0.55)] backdrop-blur-xl lg:hidden">
@@ -81,7 +82,7 @@ export function MobileBottomNav() {
                 <OfflineStatus />
               </div>
               <div className="grid grid-cols-2 gap-2">
-                {moreItems.map((item) => (
+                {permittedMoreItems.map((item) => (
                   <DialogClose key={item.href} asChild>
                     <Link
                       href={item.href}

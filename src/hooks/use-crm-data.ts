@@ -6,12 +6,12 @@ import { addHours } from "date-fns";
 import { buildFollowUpTaskFromInteraction, normalizeLead, normalizeTask } from "@/lib/crm-records";
 import { clearOfflineDbForUser, type OfflineSyncMode } from "@/lib/offline/db";
 import { useNetworkStatus } from "@/lib/offline/network-status";
-import { loadCrmSnapshot, putLocalRecord, putSyncedLocalRecord, saveCrmSnapshot } from "@/lib/offline/offline-store";
+import { accessSignature, loadCrmSnapshot, putLocalRecord, putSyncedLocalRecord, saveCrmSnapshot } from "@/lib/offline/offline-store";
 import { enqueueOperation, getSyncSummary, retryFailedOperations, syncPendingOperations, type SyncSummary } from "@/lib/offline/sync-queue";
 import { interactionSchema } from "@/lib/schemas";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase/client";
 import { clearPrivateRuntimeCache } from "@/lib/offline/pwa-cache";
-import type { Interaction, Lead, MessageTemplate, Profile, Task } from "@/lib/types";
+import type { Interaction, Lead, MessageTemplate, PartnerNotification, Profile, Task } from "@/lib/types";
 
 type CrmState = {
   leads: Lead[];
@@ -19,6 +19,7 @@ type CrmState = {
   tasks: Task[];
   templates: MessageTemplate[];
   profiles: Profile[];
+  notifications: PartnerNotification[];
 };
 
 function uuid() {
@@ -33,8 +34,17 @@ function getErrorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
+function isMissingPartnerNotificationsTable(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const record = error as { code?: unknown; message?: unknown };
+  if (record.code === "PGRST205" || record.code === "42P01") return true;
+  return typeof record.message === "string"
+    && record.message.includes("partner_notifications")
+    && /(schema cache|does not exist)/i.test(record.message);
+}
+
 export function useCrmData() {
-  const [state, setState] = React.useState<CrmState>({ leads: [], interactions: [], tasks: [], templates: [], profiles: [] });
+  const [state, setState] = React.useState<CrmState>({ leads: [], interactions: [], tasks: [], templates: [], profiles: [], notifications: [] });
   const [loading, setLoading] = React.useState(true);
   const [userEmail, setUserEmail] = React.useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = React.useState<string | null>(null);
@@ -118,12 +128,19 @@ export function useCrmData() {
 
       if (!userData.user) {
         setCurrentProfile(null);
-        setState({ leads: [], interactions: [], tasks: [], templates: [], profiles: [] });
+        setState({ leads: [], interactions: [], tasks: [], templates: [], profiles: [], notifications: [] });
         return;
       }
 
       const { data: ownProfile } = await supabase.from("profiles").select("*").eq("id", userData.user.id).maybeSingle();
       setCurrentProfile((ownProfile as Profile | null) ?? null);
+
+      if ((ownProfile as Profile | null)?.active === false) {
+        await clearOfflineDbForUser(userData.user.id);
+        await supabase.auth.signOut();
+        setState({ leads: [], interactions: [], tasks: [], templates: [], profiles: [], notifications: [] });
+        throw new Error("Seu acesso ao CRM foi desativado. Fale com um administrador.");
+      }
 
       const [
         { data: leads, error: leadsError },
@@ -131,12 +148,14 @@ export function useCrmData() {
         { data: tasks, error: tasksError },
         { data: templates, error: templatesError },
         { data: profiles, error: profilesError },
+        { data: notifications, error: notificationsError },
       ] = await Promise.all([
         supabase.from("leads").select("*").order("updated_at", { ascending: false }),
         supabase.from("interactions").select("*").order("created_at", { ascending: false }),
         supabase.from("tasks").select("*").order("due_date", { ascending: true }),
         supabase.from("message_templates").select("*").order("title", { ascending: true }),
         supabase.from("profiles").select("*").order("name", { ascending: true }),
+        supabase.from("partner_notifications").select("*").order("created_at", { ascending: false }),
       ]);
 
       if (leadsError) throw leadsError;
@@ -144,6 +163,10 @@ export function useCrmData() {
       if (tasksError) throw tasksError;
       if (templatesError) throw templatesError;
       if (profilesError && ownProfile?.role === "admin") throw profilesError;
+      // Keeps existing CRM installations usable during the short window before the
+      // additive notification migration is applied. Permission and RLS errors are
+      // still surfaced instead of being hidden.
+      if (notificationsError && !isMissingPartnerNotificationsTable(notificationsError)) throw notificationsError;
 
       const nextState = {
         leads: (leads ?? []) as Lead[],
@@ -151,9 +174,10 @@ export function useCrmData() {
         tasks: (tasks ?? []) as Task[],
         templates: (templates ?? []) as MessageTemplate[],
         profiles: (profiles ?? []) as Profile[],
+        notifications: notificationsError ? [] : (notifications ?? []) as PartnerNotification[],
       };
 
-      const mergedSnapshot = await saveCrmSnapshot(userData.user.id, nextState);
+      const mergedSnapshot = await saveCrmSnapshot(userData.user.id, nextState, accessSignature((ownProfile as Profile | null) ?? null));
       setConfigurationError(null);
       setState(mergedSnapshot);
       await refreshSyncSummary(userData.user.id);
@@ -171,7 +195,7 @@ export function useCrmData() {
       const message = error instanceof Error ? error.message : "Nao foi possivel carregar os dados do Supabase.";
       setConfigurationError(message);
       toast.error(message);
-      setState({ leads: [], interactions: [], tasks: [], templates: [], profiles: [] });
+      setState({ leads: [], interactions: [], tasks: [], templates: [], profiles: [], notifications: [] });
     } finally {
       setLoading(false);
     }
@@ -257,9 +281,14 @@ export function useCrmData() {
       const payload = leadWithUser;
       const { data, error } = await supabase.from("leads").upsert(payload).select("*").single();
       if (error) throw error;
+      const savedLead = (data ?? payload) as Lead;
+      updateLocalState((current) => ({
+        ...current,
+        leads: [savedLead, ...current.leads.filter((lead) => lead.id !== savedLead.id)],
+      }));
       toast.success("Lead salvo com sucesso.");
-      await refresh();
-      return data as Lead;
+      void refresh();
+      return savedLead;
     } catch (error) {
       if (!network.online) throw error;
       const message = getErrorMessage(error, "Erro ao salvar lead.");
@@ -281,7 +310,8 @@ export function useCrmData() {
       if (!isSupabaseConfigured || !supabase) throw new Error("Supabase nao configurado.");
       const { error } = await supabase.from("leads").delete().eq("id", id);
       if (error) throw error;
-      await refresh();
+      updateLocalState((current) => ({ ...current, leads: current.leads.filter((item) => item.id !== id) }));
+      void refresh();
       toast.success("Lead removido.");
     } catch (error) {
       console.error(error);
@@ -343,7 +373,12 @@ export function useCrmData() {
         .eq("id", leadId);
       if (leadError) throw leadError;
 
-      await refresh();
+      updateLocalState((current) => ({
+        ...current,
+        interactions: [interactionWithUser, ...current.interactions],
+        leads: current.leads.map((item) => (item.id === leadId ? updatedLead : item)),
+      }));
+      void refresh();
       toast.success("Interacao registrada.");
     } catch (error) {
       console.error(error);
@@ -554,7 +589,7 @@ export function useCrmData() {
     setCurrentUserId(null);
     setCurrentProfile(null);
     setSyncSummary({ pending: 0, failed: 0, conflict: 0, operations: [] });
-    setState({ leads: [], interactions: [], tasks: [], templates: [], profiles: [] });
+    setState({ leads: [], interactions: [], tasks: [], templates: [], profiles: [], notifications: [] });
     toast.success("Sessao encerrada.");
   }
 
@@ -592,6 +627,25 @@ export function useCrmData() {
       console.error(error);
       toast.error("Erro ao registrar retorno da visita.");
       throw error;
+    }
+  }
+
+  async function markPartnerNotificationRead(id: string) {
+    if (!network.online) {
+      toast.info("Conecte-se para marcar o briefing como lido.");
+      return;
+    }
+    try {
+      if (!isSupabaseConfigured || !supabase) throw new Error("Supabase nao configurado.");
+      const readAt = new Date().toISOString();
+      const { error } = await supabase.from("partner_notifications").update({ read_at: readAt }).eq("id", id);
+      if (error) throw error;
+      updateLocalState((current) => ({
+        ...current,
+        notifications: current.notifications.map((notification) => notification.id === id ? { ...notification, read_at: readAt } : notification),
+      }));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel atualizar a notificacao.");
     }
   }
 
@@ -645,5 +699,6 @@ export function useCrmData() {
     signOut,
     importLeads,
     updatePartnerVisit,
+    markPartnerNotificationRead,
   };
 }

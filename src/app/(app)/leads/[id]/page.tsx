@@ -217,7 +217,7 @@ export default function LeadDetailPage() {
 
       <LeadTemplatePanel lead={lead} templates={templates} onAddInteraction={(input) => addInteraction(lead.id, input)} />
 
-      {currentProfile?.role !== "partner" ? (
+      {currentProfile?.role === "admin" ? (
         <PartnerAssignmentPanel lead={lead} partners={profiles.filter((profile) => profile.role === "partner")} onUpdate={(input) => updateLead(lead.id, input)} />
       ) : null}
 
@@ -534,7 +534,7 @@ function PartnerAssignmentPanel({
     try {
       await onUpdate({
         partner_id: partnerId === "none" ? null : partnerId,
-        partner_name: partnerId === "none" ? null : selectedPartner?.name || selectedPartner?.email || "Bruno",
+        partner_name: partnerId === "none" ? null : selectedPartner?.name || selectedPartner?.email || "Parceiro",
         visit_scheduled_at: visitDate ? new Date(visitDate).toISOString() : null,
         visit_status: visitStatus as Lead["visit_status"],
       });
@@ -566,7 +566,7 @@ function PartnerAssignmentPanel({
           <UserRound className="size-5 text-accent" />
           Atribuicao da visita tecnica
         </CardTitle>
-        <CardDescription>Defina Bruno/parceiro, data e status para entregar o lead antes da visita.</CardDescription>
+        <CardDescription>Defina o parceiro, a data e o status para entregar o lead antes da visita.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto_auto]">
         <Field label="Parceiro">

@@ -10,7 +10,7 @@ Este guia prepara a aplicacao para rodar online na Vercel com Supabase em produc
 - Variaveis `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY` configuradas na Vercel.
 - Primeiro usuario criado pelo `/register`.
 - Usuario principal promovido para `admin`.
-- Usuario Bruno criado e promovido para `partner`, se for usar o painel do parceiro.
+- Usuarios Bruno e Rafael criados e promovidos para `partner`, se forem usar o painel do parceiro.
 - Deploy da Vercel executado novamente depois de alterar variaveis.
 
 ## Variaveis de Ambiente
@@ -34,7 +34,7 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=SUA_CHAVE_PUBLICAVEL
 
 Use `NEXT_PUBLIC_SUPABASE_ANON_KEY` como padrao para este deploy.
 
-Nao configure `SUPABASE_SERVICE_ROLE_KEY` na Vercel para o fluxo atual. A aplicacao nao precisa dessa chave em producao. Se no futuro existir API server-only de administracao, use `SUPABASE_SERVICE_ROLE_KEY` apenas no backend, nunca em componente client e nunca com prefixo `NEXT_PUBLIC`.
+`SUPABASE_SERVICE_ROLE_KEY` e opcional. Configure-a apenas no ambiente de backend da Vercel se quiser usar o convite por e-mail na central **Usuarios e acessos**. Ela nunca pode ter prefixo `NEXT_PUBLIC`, nunca pode ser exibida na interface e nao e necessaria para login, CRM, parceiros ou RLS.
 
 ## Supabase
 
@@ -55,7 +55,7 @@ Para uma instalacao nova, aplique somente:
 supabase/schema.sql
 ```
 
-Esse arquivo ja inclui:
+Esse arquivo inclui a base do CRM. Depois aplique as migrations incrementais listadas abaixo para deixar a base na versao atual de parceiros, notificacoes e controle de acesso.
 
 - `profiles`
 - `leads`
@@ -66,6 +66,7 @@ Esse arquivo ja inclui:
 - campos de visita
 - briefing de visita
 - RPC segura `partner_update_visit_feedback`
+- notificacoes internas de briefing para parceiros
 - RLS
 - policies
 - triggers de `updated_at`
@@ -79,10 +80,12 @@ No Supabase Dashboard:
 3. Cole o conteudo completo de `supabase/schema.sql`.
 4. Execute.
 
-Se o banco ja tinha recebido uma versao antiga sem parceiro/briefing, execute depois:
+Se o banco ja tinha recebido uma versao antiga, execute as migrations incrementais aplicaveis depois:
 
 ```text
 supabase/migrations/add_partner_briefing.sql
+supabase/migrations/add_partner_notifications.sql
+supabase/migrations/add_access_control.sql
 ```
 
 ### 3. Ordem das Migrations
@@ -90,11 +93,16 @@ supabase/migrations/add_partner_briefing.sql
 Instalacao nova:
 
 1. `supabase/schema.sql`
+2. `supabase/migrations/add_partner_briefing.sql`
+3. `supabase/migrations/add_partner_notifications.sql`
+4. `supabase/migrations/add_access_control.sql`
 
 Banco existente antigo:
 
 1. `supabase/schema.sql`, se ainda nao foi aplicado.
 2. `supabase/migrations/add_partner_briefing.sql`, se os campos de parceiro ainda nao existirem.
+3. `supabase/migrations/add_partner_notifications.sql`, para avisos internos de briefing e grants explicitos ao papel `authenticated`.
+4. `supabase/migrations/add_access_control.sql`, para papeis, permissoes individuais, auditoria, bloqueio de autoelevacao e cache offline seguro por acesso.
 
 ### 4. Supabase Auth URLs
 

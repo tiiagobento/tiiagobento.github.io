@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppHeader } from "@/components/app-header";
@@ -20,6 +22,10 @@ const supabaseMocks = vi.hoisted(() => ({
 vi.mock("next/navigation", () => ({
   usePathname: () => "/dashboard",
   useRouter: () => routerMocks,
+}));
+
+vi.mock("next/image", () => ({
+  default: () => null,
 }));
 
 vi.mock("next-themes", () => ({
@@ -115,6 +121,12 @@ describe("app navigation", () => {
   it("limits partner navigation to the partner panel plus logout", () => {
     const labels = getVisibleNavigationItems("partner").map((item) => item.label);
 
-    expect(labels).toEqual(["Parceiro/Bruno"]);
+    expect(labels).toEqual(["Parceiros"]);
+  });
+
+  it("only exposes the user management route to administrators", () => {
+    expect(getVisibleNavigationItems("admin").map((item) => item.href)).toContain("/settings/users");
+    expect(getVisibleNavigationItems("user").map((item) => item.href)).not.toContain("/settings/users");
+    expect(getVisibleNavigationItems("partner").map((item) => item.href)).not.toContain("/settings/users");
   });
 });

@@ -10,12 +10,17 @@ export default defineConfig({
     },
   },
   test: {
-    environment: "jsdom",
+    // Most suites exercise pure business logic or route handlers and do not
+    // need a browser. Keeping those in Node avoids paying the jsdom startup
+    // cost for every file on Windows; UI-facing suites opt into jsdom below.
+    environment: "node",
     setupFiles: ["./vitest.setup.ts"],
     include: ["src/**/*.test.{ts,tsx}"],
     exclude: ["node_modules", ".next", "e2e"],
     css: true,
-    pool: "vmThreads",
+    // Preserve module isolation between route and UI suites. This avoids mock
+    // state leaking between authorization tests on Windows.
+    pool: "forks",
     fileParallelism: false,
     maxWorkers: 1,
     testTimeout: 120_000,

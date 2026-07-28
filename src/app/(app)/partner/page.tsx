@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { format, isToday, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarCheck, ClipboardCheck, ExternalLink, MessageSquareText, UserRound } from "lucide-react";
+import { BellRing, CalendarCheck, ClipboardCheck, ExternalLink, MessageSquareText, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/empty-state";
 import { LeadPriorityBadge, LeadScoreBadge } from "@/components/lead-badges";
@@ -18,13 +18,35 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useCrmData } from "@/hooks/use-crm-data";
+import { supabase } from "@/lib/supabase/client";
 import { visitStatuses } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import type { Lead } from "@/lib/types";
 
 export default function PartnerPage() {
-  const { leads, currentProfile, loading, updateLead, updatePartnerVisit } = useCrmData();
+  const { leads, notifications, currentProfile, loading, updateLead, updatePartnerVisit, markPartnerNotificationRead } = useCrmData();
   const [selectedLeadId, setSelectedLeadId] = React.useState<string | null>(null);
+  const [canOpenWhatsApp, setCanOpenWhatsApp] = React.useState(false);
+  const currentProfileId = currentProfile?.id;
+
+  React.useEffect(() => {
+    let active = true;
+
+    async function loadWhatsAppPermission() {
+      if (!supabase || !currentProfileId) {
+        if (active) setCanOpenWhatsApp(false);
+        return;
+      }
+
+      const { data, error } = await supabase.rpc("has_permission", { permission_name: "whatsapp.open" });
+      if (active) setCanOpenWhatsApp(!error && Boolean(data));
+    }
+
+    void loadWhatsAppPermission();
+    return () => {
+      active = false;
+    };
+  }, [currentProfileId]);
 
   if (loading) return <LoadingSkeleton />;
 
@@ -40,6 +62,7 @@ export default function PartnerPage() {
   const todayVisits = assignedLeads.filter((lead) => lead.visit_scheduled_at && isToday(parseISO(lead.visit_scheduled_at)));
   const completedVisits = assignedLeads.filter((lead) => lead.visit_status === "Visita realizada");
   const waitingFeedback = assignedLeads.filter((lead) => lead.visit_status === "Visita realizada" && !lead.partner_visit_feedback);
+  const unreadBriefings = notifications.filter((notification) => !notification.read_at && notification.lead_id);
 
   async function saveFeedback(lead: Lead, input: Pick<Lead, "visit_status" | "partner_notes" | "partner_visit_feedback">) {
     if (currentProfile?.role === "partner") {
@@ -59,9 +82,9 @@ export default function PartnerPage() {
             <UserRound className="size-5" />
           </div>
           <div>
-            <h1 className="text-2xl font-semibold">Painel do Parceiro</h1>
+            <h1 className="text-2xl font-semibold">Ola, {currentProfile?.name || "parceiro"}</h1>
             <p className="mt-1 max-w-3xl text-sm text-white/72">
-              Leads atribuidos para visita tecnica, briefing e retorno de campo. Bruno ve somente os leads vinculados ao usuario dele.
+              {unreadBriefings.length ? `${unreadBriefings.length} briefing(s) aguardam sua revisao.` : "Sua agenda de visitas, briefings e retornos de campo em um so lugar."} Cada parceiro ve somente os leads vinculados ao proprio usuario.
             </p>
           </div>
         </CardContent>
@@ -74,6 +97,29 @@ export default function PartnerPage() {
         <Metric title="Aguardando retorno" value={waitingFeedback.length} tone={waitingFeedback.length ? "danger" : "default"} />
       </section>
 
+      {unreadBriefings.length ? (
+        <section className="grid gap-3 lg:grid-cols-2">
+          {unreadBriefings.slice(0, 4).map((notification) => (
+            <Card key={notification.id} className="border-accent/30 bg-accent/5">
+              <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <BellRing className="size-4 text-accent" />
+                    {notification.title}
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">{notification.body || "Um briefing de visita esta pronto para sua revisao."}</p>
+                </div>
+                <Button asChild size="sm" className="shrink-0">
+                  <Link href={`/leads/${notification.lead_id}/briefing`} onClick={() => void markPartnerNotificationRead(notification.id)}>
+                    Abrir briefing
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </section>
+      ) : null}
+
       <section className="grid gap-4 xl:grid-cols-[1fr_420px]">
         <Card>
           <CardHeader>
@@ -83,10 +129,10 @@ export default function PartnerPage() {
           <CardContent className="space-y-3">
             {assignedLeads.length ? (
               assignedLeads.map((lead) => (
-                <PartnerLeadCard key={lead.id} lead={lead} active={selectedLead?.id === lead.id} onSelect={() => setSelectedLeadId(lead.id)} />
+                <PartnerLeadCard key={lead.id} lead={lead} active={selectedLead?.id === lead.id} canOpenWhatsApp={canOpenWhatsApp} onSelect={() => setSelectedLeadId(lead.id)} />
               ))
             ) : (
-              <EmptyState icon={UserRound} title="Nenhum lead atribuido" description="Quando o admin atribuir uma visita ao Bruno, ela aparece aqui." />
+              <EmptyState icon={UserRound} title="Nenhum lead atribuido" description="Quando o admin atribuir uma visita a este parceiro, ela aparece aqui." />
             )}
           </CardContent>
         </Card>
@@ -117,7 +163,7 @@ function Metric({ title, value, tone = "default" }: { title: string; value: numb
   );
 }
 
-function PartnerLeadCard({ lead, active, onSelect }: { lead: Lead; active: boolean; onSelect: () => void }) {
+function PartnerLeadCard({ lead, active, canOpenWhatsApp, onSelect }: { lead: Lead; active: boolean; canOpenWhatsApp: boolean; onSelect: () => void }) {
   return (
     <div className={cn("rounded-xl border bg-card p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md", active && "border-accent shadow-md ring-2 ring-accent/15")}>
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -138,7 +184,7 @@ function PartnerLeadCard({ lead, active, onSelect }: { lead: Lead; active: boole
           <Button type="button" variant="outline" size="sm" onClick={onSelect}>
             Registrar retorno
           </Button>
-          <WhatsAppButton lead={lead} size="sm" />
+          {canOpenWhatsApp ? <WhatsAppButton lead={lead} size="sm" /> : null}
           <Button asChild variant="outline" size="sm">
             <Link href={`/leads/${lead.id}/briefing`}>
               <ExternalLink className="size-4" />

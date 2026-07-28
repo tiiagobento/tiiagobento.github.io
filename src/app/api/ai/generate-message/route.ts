@@ -4,7 +4,7 @@ import { parseAIJsonResponse } from "@/lib/ai/parse-ai-json";
 import { AIConfigurationError, getConfiguredAIProvider } from "@/lib/ai/provider";
 import { AI_REPLY_IMAGE_TOTAL_MAX_BYTES, AI_REPLY_IMAGE_TOTAL_SIZE_MESSAGE, estimateBase64Bytes, normalizeImageMimeType } from "@/lib/ai/image-utils";
 import { AIProviderRequestError, UNSUPPORTED_IMAGE_PROVIDER_MESSAGE } from "@/lib/ai/providers/shared";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { authorizeServerPermission } from "@/lib/supabase/route-auth";
 
 export const runtime = "nodejs";
 
@@ -31,8 +31,12 @@ const responseSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  if (!(await isAuthenticated())) {
+  const authorization = await authorizeServerPermission("ai.generate");
+  if (authorization.status === "unauthenticated") {
     return NextResponse.json({ error: "Sessão inválida. Faça login novamente." }, { status: 401 });
+  }
+  if (authorization.status === "forbidden") {
+    return NextResponse.json({ error: "Sua conta não possui permissão para gerar mensagens com IA." }, { status: 403 });
   }
 
   const parsedRequest = requestSchema.safeParse(await request.json().catch(() => null));
@@ -61,16 +65,6 @@ export async function POST(request: Request) {
     }
     const message = error instanceof Error ? error.message : "Não foi possível gerar a mensagem.";
     return NextResponse.json({ error: message }, { status: 502 });
-  }
-}
-
-async function isAuthenticated() {
-  try {
-    const supabase = await createSupabaseServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    return Boolean(user);
-  } catch {
-    return false;
   }
 }
 

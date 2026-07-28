@@ -27,7 +27,10 @@ def run_adb(*args: str) -> bool:
         print(f"ERRO: ADB nao encontrado em {ADB}")
         return False
     cmd = [str(ADB), *args]
-    print(f"> {' '.join(cmd)}")
+    visible_args = list(args)
+    if visible_args and visible_args[0] == "pair" and len(visible_args) >= 3:
+        visible_args[-1] = "[oculto]"
+    print(f"> {ADB} {' '.join(visible_args)}")
     result = subprocess.run(cmd, text=True, capture_output=True)
     if result.stdout.strip():
         print(result.stdout.strip())
@@ -92,8 +95,7 @@ def main() -> int:
     print("============================================")
     print()
     print(f"QR gerado em: {QR_PATH}")
-    print(f"Service Name: {service_name}")
-    print(f"Password: {password}")
+    print("Credencial temporaria criada e incorporada somente ao QR exibido.")
     print()
     print("No celular:")
     print("1. Abra Depuracao sem fio.")

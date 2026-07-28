@@ -17,16 +17,17 @@ export const navigationItems = [
   { href: "/pipeline", label: "Pipeline", icon: Columns3 },
   { href: "/tasks", label: "Tarefas", icon: ClipboardList },
   { href: "/templates", label: "Templates", icon: MessageSquareText },
-  { href: "/partner", label: "Parceiro/Bruno", icon: UserCheck },
+  { href: "/partner", label: "Parceiros", icon: UserCheck },
   { href: "/import-export", label: "Importar/Exportar", icon: FileUp },
   { href: "/settings", label: "Configuracoes", icon: Settings },
+  { href: "/settings/users", label: "Usuarios e acessos", icon: Users, adminOnly: true },
 ];
 
 export function getVisibleNavigationItems(role: ProfileRole | null) {
   if (role === "partner") {
     return navigationItems.filter((item) => item.href === "/partner");
   }
-  return navigationItems;
+  return navigationItems.filter((item) => !item.adminOnly || role === "admin");
 }
 
 export function isNavigationItemActive(pathname: string, href: string) {
