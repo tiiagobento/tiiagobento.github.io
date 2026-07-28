@@ -37,5 +37,6 @@ android/app/build/outputs/**/*.aab
 dist-mobile/*.apk
 dist-mobile/*.aab
 dist-mobile/*.log
+dist-mobile/*-UNSIGNED.txt
 dist-mobile/qr-*.png
 dist-mobile/android-app-open.png

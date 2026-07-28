@@ -13,6 +13,7 @@
     "android:sync": "cap sync android",
     "android:debug": "cd android && gradlew.bat assembleDebug",
     "android:release": "cd android && gradlew.bat assembleRelease",
+    "android:release:unsigned": "cd android && gradlew.bat assembleRelease -PallowUnsignedRelease=true",
     "android:bundle": "cd android && gradlew.bat bundleRelease"
   },
   "dependencies": {

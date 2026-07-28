@@ -8,16 +8,23 @@ android {
     def releaseKeyAlias = System.getenv("NOVAFORMA_ANDROID_KEY_ALIAS")
     def releaseKeyPassword = System.getenv("NOVAFORMA_ANDROID_KEY_PASSWORD")
     def hasReleaseSigning = releaseKeystorePath && releaseKeystorePassword && releaseKeyAlias && releaseKeyPassword
+    def allowUnsignedRelease = project.hasProperty("allowUnsignedRelease") &&
+        project.property("allowUnsignedRelease").toString().equalsIgnoreCase("true")
     def requestedReleaseBuild = gradle.startParameter.taskNames.any { taskName ->
         taskName.toLowerCase().contains("release")
     }
 
-    if (requestedReleaseBuild && !hasReleaseSigning) {
+    if (requestedReleaseBuild && !hasReleaseSigning && !allowUnsignedRelease) {
         throw new GradleException(
             "Release signing is required. Set NOVAFORMA_ANDROID_KEYSTORE_PATH, " +
             "NOVAFORMA_ANDROID_KEYSTORE_PASSWORD, NOVAFORMA_ANDROID_KEY_ALIAS, and " +
-            "NOVAFORMA_ANDROID_KEY_PASSWORD before building a release APK."
+            "NOVAFORMA_ANDROID_KEY_PASSWORD before building a release APK. " +
+            "For a non-installable artifact to sign later, use -PallowUnsignedRelease=true."
         )
+    }
+
+    if (requestedReleaseBuild && !hasReleaseSigning && allowUnsignedRelease) {
+        logger.warn("Building an unsigned release artifact. It must be signed before installation or distribution.")
     }
 
     defaultConfig {
