@@ -6,6 +6,10 @@ import { toast } from "sonner";
 import { registerPushDeviceToken } from "@/lib/push/client";
 import { supabase } from "@/lib/supabase/client";
 
+const pushNotificationsEnabled =
+  process.env.NEXT_PUBLIC_ENABLE_PUSH_NOTIFICATIONS === "true" &&
+  process.env.NEXT_PUBLIC_ANDROID_FIREBASE_CONFIGURED === "true";
+
 function pushDeepLink(data: Record<string, unknown> | undefined) {
   const candidate = data?.deep_link;
   return typeof candidate === "string" && /^\/(dashboard|partner|leads|tasks)(?:\/|$)/.test(candidate) ? candidate : "/partner";
@@ -13,7 +17,7 @@ function pushDeepLink(data: Record<string, unknown> | undefined) {
 
 export function PushNotificationRegister() {
   React.useEffect(() => {
-    if (!supabase || !Capacitor.isNativePlatform()) return;
+    if (!pushNotificationsEnabled || !supabase || !Capacitor.isNativePlatform()) return;
     const client = supabase;
 
     let active = true;
@@ -67,7 +71,11 @@ export function PushNotificationRegister() {
     });
 
     const { data: { subscription } } = client.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) void registerForPushNotifications();
+      if (session?.user) {
+        void registerForPushNotifications().catch(() => {
+          if (active) toast.error("Nao foi possivel ativar as notificacoes neste aparelho.");
+        });
+      }
     });
 
     return () => {

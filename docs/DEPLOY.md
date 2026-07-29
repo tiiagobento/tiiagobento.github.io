@@ -395,6 +395,7 @@ As notificacoes remotas abrangem as atividades comerciais que ja possuem eventos
 1. Aplique `supabase/migrations/add_push_notifications.sql` apos a migration de controle de acesso.
 2. No [Firebase Console](https://console.firebase.google.com/), crie ou selecione o projeto e cadastre o app Android `br.com.novaforma.crm`.
 3. Baixe `google-services.json` e coloque-o em `android/app/google-services.json`. O arquivo ja esta no `.gitignore`.
+4. Mantenha `NEXT_PUBLIC_ENABLE_PUSH_NOTIFICATIONS=false` e `NEXT_PUBLIC_ANDROID_FIREBASE_CONFIGURED=false` ate o APK/AAB ser reconstruido com `google-services.json`. Ative as duas variaveis como `true` somente depois de configurar Firebase no Android.
 4. Crie uma service account com permissao para Firebase Cloud Messaging. Na Vercel, em **Project Settings > Environment Variables**, configure em Production (e Preview, se desejar):
 
 ```env
@@ -411,3 +412,4 @@ FIREBASE_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
 7. No Android 13 ou superior, entre no CRM e aceite a permissao de notificacoes. Ao atribuir um briefing a Bruno ou Rafael, o token registrado por aquele usuario recebera a notificacao.
 
 Nao configure nenhuma dessas variaveis com `NEXT_PUBLIC_`. Sem Firebase, webhook e APK reconstruido, o CRM mantem os avisos internos, mas push remoto nao sera entregue.
+Sem Firebase no APK, deixar push nativo ativo pode impedir o registro correto; por isso o padrao seguro e manter `NEXT_PUBLIC_ENABLE_PUSH_NOTIFICATIONS=false` e `NEXT_PUBLIC_ANDROID_FIREBASE_CONFIGURED=false`.

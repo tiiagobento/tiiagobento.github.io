@@ -173,6 +173,7 @@ O APK pode receber notificacoes remotas para briefing ou visita atribuidos/alter
 
 1. Aplique `supabase/migrations/add_push_notifications.sql` depois de `add_access_control.sql`.
 2. No Firebase, cadastre o app Android com o package `br.com.novaforma.crm` e salve o arquivo `google-services.json` em `android/app/google-services.json`. Esse arquivo e ignorado pelo Git.
+3. Mantenha `NEXT_PUBLIC_ENABLE_PUSH_NOTIFICATIONS=false` e `NEXT_PUBLIC_ANDROID_FIREBASE_CONFIGURED=false` ate o APK/AAB ser reconstruido com `google-services.json`. Ative as duas variaveis como `true` somente depois de configurar Firebase no Android.
 3. Crie uma credencial de service account do Firebase somente para o servidor e configure na Vercel, sem prefixo `NEXT_PUBLIC`:
 
 ```env
@@ -185,6 +186,7 @@ FIREBASE_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
 5. Refaça o build do APK apos adicionar o `google-services.json`; no Android 13 ou superior, aceite a permissao de notificacoes ao entrar no CRM.
 
 Sem essas configuracoes externas, o CRM continua funcional com avisos internos, mas o Android nao recebe push remoto.
+Sem Firebase no APK, deixar push nativo ativo pode impedir o registro correto; por isso o padrao seguro e manter `NEXT_PUBLIC_ENABLE_PUSH_NOTIFICATIONS=false` e `NEXT_PUBLIC_ANDROID_FIREBASE_CONFIGURED=false`.
 
 ## Deploy na Vercel
 
