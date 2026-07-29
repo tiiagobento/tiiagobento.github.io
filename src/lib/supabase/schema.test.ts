@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 const schema = readFileSync(resolve(process.cwd(), "supabase/schema.sql"), "utf8");
 const partnerNotificationsMigration = readFileSync(resolve(process.cwd(), "supabase/migrations/add_partner_notifications.sql"), "utf8");
 const accessControlMigration = readFileSync(resolve(process.cwd(), "supabase/migrations/add_access_control.sql"), "utf8");
+const pushNotificationsMigration = readFileSync(resolve(process.cwd(), "supabase/migrations/add_push_notifications.sql"), "utf8");
 
 describe("Supabase interaction follow-up trigger", () => {
   it("creates the follow-up task after a new interaction with a next contact", () => {
@@ -64,5 +65,19 @@ describe("Supabase access control migration", () => {
     expect(accessControlMigration).toContain('drop policy if exists "leads_select_authorized"');
     expect(accessControlMigration).toContain('drop policy if exists "partner_notifications_select_authorized"');
     expect(accessControlMigration).toContain('drop policy if exists "permissions_select_authenticated"');
+  });
+});
+
+describe("Supabase Android push notification migration", () => {
+  it("keeps device tokens recipient-scoped and queues partner activity without deleting CRM data", () => {
+    expect(pushNotificationsMigration).toContain("create table if not exists public.push_device_tokens");
+    expect(pushNotificationsMigration).toContain("create table if not exists public.push_notification_deliveries");
+    expect(pushNotificationsMigration).toContain("enable row level security");
+    expect(pushNotificationsMigration).toContain("create policy \"push_device_tokens_select_own\"");
+    expect(pushNotificationsMigration).toContain("create or replace function public.register_push_device_token");
+    expect(pushNotificationsMigration).toContain("create trigger partner_notifications_enqueue_push");
+    expect(pushNotificationsMigration).toContain("partner_feedback_received");
+    expect(pushNotificationsMigration).toContain("status in ('pending', 'sending', 'sent', 'failed', 'skipped')");
+    expect(pushNotificationsMigration).not.toMatch(/drop\s+table|truncate\s+table|delete\s+from\s+public\.(leads|profiles|tasks|interactions)/i);
   });
 });

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { ClipboardList, Columns3, FileUp, LayoutDashboard, LogOut, MessageSquareText, Plus, Settings, Sparkles, UserCheck, Users } from "lucide-react";
 import { clearOfflineDbForUser } from "@/lib/offline/db";
 import { clearPrivateRuntimeCache } from "@/lib/offline/pwa-cache";
+import { revokeCurrentPushDeviceToken } from "@/lib/push/client";
 import { supabase } from "@/lib/supabase/client";
 import type { ProfileRole } from "@/lib/types";
 
@@ -68,6 +69,9 @@ export function useLogout() {
     try {
       if (!supabase) throw new Error("Supabase nao configurado.");
       const { data } = await supabase.auth.getSession();
+      if (data.session?.user.id) {
+        await revokeCurrentPushDeviceToken(data.session.user.id);
+      }
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       if (data.session?.user.id) {

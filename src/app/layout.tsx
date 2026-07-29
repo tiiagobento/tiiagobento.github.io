@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Toaster } from "sonner";
 import { PwaRegister } from "@/components/pwa-register";
+import { PushNotificationRegister } from "@/components/push-notification-register";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
           <PwaRegister />
+          <PushNotificationRegister />
           {children}
           <Toaster richColors position="top-right" />
         </ThemeProvider>

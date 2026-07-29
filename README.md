@@ -27,7 +27,7 @@ O app exige Supabase configurado. Sem as variaveis `NEXT_PUBLIC_SUPABASE_URL` e 
 1. Crie um projeto no Supabase.
 2. Abra o SQL Editor.
 3. Execute todo o arquivo `supabase/schema.sql`. Esse arquivo inclui Auth profiles, CRM, RLS, automacoes, briefing de visita e painel do parceiro.
-4. Em seguida execute, nesta ordem, `supabase/migrations/add_partner_briefing.sql`, `supabase/migrations/add_partner_notifications.sql` e `supabase/migrations/add_access_control.sql`. Todas sao idempotentes e nao removem leads, tarefas, interacoes ou perfis.
+4. Em seguida execute, nesta ordem, `supabase/migrations/add_partner_briefing.sql`, `supabase/migrations/add_partner_notifications.sql`, `supabase/migrations/add_access_control.sql` e `supabase/migrations/add_push_notifications.sql`. Todas sao idempotentes e nao removem leads, tarefas, interacoes ou perfis.
 5. Copie `.env.example` para `.env.local`.
 6. Preencha as variaveis:
 
@@ -167,6 +167,25 @@ where email = 'email-do-bruno@exemplo.com';
 
 Para atribuir uma visita, edite um lead como admin e preencha parceiro, data/status da visita e observacoes. Bruno ou Rafael acessam `/partner`, abrem somente os briefings atribuidos a cada conta e registram o retorno. O admin ve o retorno na ficha do lead e a alteracao fica na auditoria.
 
+## Notificacoes push Android
+
+O APK pode receber notificacoes remotas para briefing ou visita atribuidos/alterados para um parceiro e para retornos de visita enviados pelo parceiro ao responsavel pelo lead. A notificacao abre o briefing ou a ficha correspondente; ela nao envia WhatsApp nem altera dados por conta propria.
+
+1. Aplique `supabase/migrations/add_push_notifications.sql` depois de `add_access_control.sql`.
+2. No Firebase, cadastre o app Android com o package `br.com.novaforma.crm` e salve o arquivo `google-services.json` em `android/app/google-services.json`. Esse arquivo e ignorado pelo Git.
+3. Crie uma credencial de service account do Firebase somente para o servidor e configure na Vercel, sem prefixo `NEXT_PUBLIC`:
+
+```env
+SUPABASE_SERVICE_ROLE_KEY=sua-chave-service-role
+PUSH_WEBHOOK_SECRET=segredo-longo-e-aleatorio
+FIREBASE_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
+```
+
+4. No Supabase Dashboard, crie uma **Database Webhook** para `INSERT` na tabela `partner_notifications`, apontando para `https://nova-forma-crm.vercel.app/api/internal/push/partner-notification`. Adicione o header `x-push-webhook-secret` com o mesmo valor de `PUSH_WEBHOOK_SECRET`.
+5. Refaça o build do APK apos adicionar o `google-services.json`; no Android 13 ou superior, aceite a permissao de notificacoes ao entrar no CRM.
+
+Sem essas configuracoes externas, o CRM continua funcional com avisos internos, mas o Android nao recebe push remoto.
+
 ## Deploy na Vercel
 
 Repositorio: `https://github.com/tiiagobento/tiiagobento.github.io`
@@ -176,7 +195,7 @@ Aplicacao: `https://nova-forma-crm.vercel.app`
 1. Envie as alteracoes para a branch `main`.
 2. A Vercel publica automaticamente o projeto `steelframe/nova-forma-crm`.
 3. Configure `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
-4. Nao configure `SUPABASE_SERVICE_ROLE_KEY` no frontend; use apenas se criar backend server-only no futuro.
+4. Nao configure `SUPABASE_SERVICE_ROLE_KEY` no frontend. Ela e usada apenas nas rotas server-side de convite e entrega de notificacoes push, quando esses recursos forem habilitados.
 5. Rode o deploy.
 6. No Supabase, confirme que `supabase/schema.sql` foi aplicado antes de usar o CRM.
 

@@ -150,7 +150,8 @@ export type PartnerNotification = {
     | "visit_rescheduled"
     | "visit_status_updated"
     | "feedback_requested"
-    | "deadline_approaching";
+    | "deadline_approaching"
+    | "partner_feedback_received";
   title: string;
   body?: string | null;
   read_at?: string | null;

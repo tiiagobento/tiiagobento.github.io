@@ -34,7 +34,7 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=SUA_CHAVE_PUBLICAVEL
 
 Use `NEXT_PUBLIC_SUPABASE_ANON_KEY` como padrao para este deploy.
 
-`SUPABASE_SERVICE_ROLE_KEY` e opcional. Configure-a apenas no ambiente de backend da Vercel se quiser usar o convite por e-mail na central **Usuarios e acessos**. Ela nunca pode ter prefixo `NEXT_PUBLIC`, nunca pode ser exibida na interface e nao e necessaria para login, CRM, parceiros ou RLS.
+`SUPABASE_SERVICE_ROLE_KEY` e opcional para login, CRM, parceiros e RLS. Configure-a apenas no ambiente de backend da Vercel se quiser usar convite por e-mail na central **Usuarios e acessos** ou notificacoes push Android. Ela nunca pode ter prefixo `NEXT_PUBLIC` e nunca pode ser exibida na interface.
 
 ## Supabase
 
@@ -86,6 +86,7 @@ Se o banco ja tinha recebido uma versao antiga, execute as migrations incrementa
 supabase/migrations/add_partner_briefing.sql
 supabase/migrations/add_partner_notifications.sql
 supabase/migrations/add_access_control.sql
+supabase/migrations/add_push_notifications.sql
 ```
 
 ### 3. Ordem das Migrations
@@ -96,6 +97,7 @@ Instalacao nova:
 2. `supabase/migrations/add_partner_briefing.sql`
 3. `supabase/migrations/add_partner_notifications.sql`
 4. `supabase/migrations/add_access_control.sql`
+5. `supabase/migrations/add_push_notifications.sql`
 
 Banco existente antigo:
 
@@ -103,6 +105,7 @@ Banco existente antigo:
 2. `supabase/migrations/add_partner_briefing.sql`, se os campos de parceiro ainda nao existirem.
 3. `supabase/migrations/add_partner_notifications.sql`, para avisos internos de briefing e grants explicitos ao papel `authenticated`.
 4. `supabase/migrations/add_access_control.sql`, para papeis, permissoes individuais, auditoria, bloqueio de autoelevacao e cache offline seguro por acesso.
+5. `supabase/migrations/add_push_notifications.sql`, para tokens Android por usuario, fila de entrega e notificacoes remotas de briefing/retorno.
 
 ### 4. Supabase Auth URLs
 
@@ -208,7 +211,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=SUA_ANON_PUBLIC_KEY
 
 Depois de criar ou alterar variaveis, rode Redeploy.
 
-Para este projeto, cadastre as variaveis do Supabase e as variaveis do provider de IA em Production, Preview e Development. Nao cadastre `VERCEL_OIDC_TOKEN` manualmente e nao adicione `SUPABASE_SERVICE_ROLE_KEY`, pois o fluxo atual nao precisa dela.
+Para este projeto, cadastre as variaveis do Supabase e as variaveis do provider de IA em Production, Preview e Development. Nao cadastre `VERCEL_OIDC_TOKEN` manualmente. `SUPABASE_SERVICE_ROLE_KEY` deve ser adicionada apenas ao ambiente server-side quando convites por e-mail ou push Android estiverem habilitados.
 
 ### 4. Dominio Personalizado
 
@@ -384,3 +387,27 @@ Detalhes completos:
 
 - `docs/OFFLINE_MODE.md`
 - `docs/ANDROID_APK.md`
+
+## Notificacoes Push Android
+
+As notificacoes remotas abrangem as atividades comerciais que ja possuem eventos seguros no banco: briefing ou visita atribuidos/alterados para parceiros e retorno de visita enviado pelo parceiro ao responsavel pelo lead. A entrega e feita para dispositivos Android registrados pelo proprio usuario; a notificacao apenas abre uma tela do CRM e nunca envia mensagens ou altera leads automaticamente.
+
+1. Aplique `supabase/migrations/add_push_notifications.sql` apos a migration de controle de acesso.
+2. No [Firebase Console](https://console.firebase.google.com/), crie ou selecione o projeto e cadastre o app Android `br.com.novaforma.crm`.
+3. Baixe `google-services.json` e coloque-o em `android/app/google-services.json`. O arquivo ja esta no `.gitignore`.
+4. Crie uma service account com permissao para Firebase Cloud Messaging. Na Vercel, em **Project Settings > Environment Variables**, configure em Production (e Preview, se desejar):
+
+```env
+SUPABASE_SERVICE_ROLE_KEY=SUA_CHAVE_SERVER_ONLY
+PUSH_WEBHOOK_SECRET=UM_SEGREDO_FORTE_E_ALEATORIO
+FIREBASE_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
+```
+
+5. Crie no Supabase Dashboard uma **Database Webhook** de `INSERT` para a tabela `partner_notifications`:
+   - URL: `https://nova-forma-crm.vercel.app/api/internal/push/partner-notification`
+   - Header: `x-push-webhook-secret`
+   - Valor do header: o mesmo `PUSH_WEBHOOK_SECRET` da Vercel.
+6. Faça redeploy da Vercel e gere novamente o APK depois de adicionar o arquivo Firebase.
+7. No Android 13 ou superior, entre no CRM e aceite a permissao de notificacoes. Ao atribuir um briefing a Bruno ou Rafael, o token registrado por aquele usuario recebera a notificacao.
+
+Nao configure nenhuma dessas variaveis com `NEXT_PUBLIC_`. Sem Firebase, webhook e APK reconstruido, o CRM mantem os avisos internos, mas push remoto nao sera entregue.
