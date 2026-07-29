@@ -47,8 +47,8 @@ export function formatPermissionOverrides(overrides: UserPermissionOverride[], p
 }
 
 /** Accounts that an administrator can safely turn into partners. */
-export function getEligiblePartnerAccounts(profiles: Profile[]) {
-  return profiles.filter((profile) => profile.active !== false && profile.role !== "partner");
+export function getEligiblePartnerAccounts(profiles: Profile[], currentUserId?: string | null) {
+  return profiles.filter((profile) => profile.active !== false && profile.role !== "partner" && profile.id !== currentUserId);
 }
 
 export function getLinkedPartnerAccounts(profiles: Profile[]) {

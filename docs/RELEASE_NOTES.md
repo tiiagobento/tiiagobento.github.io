@@ -1,5 +1,15 @@
 # Nova Forma CRM - Release Notes
 
+## v1.2.4 - 2026-07-29
+
+Configuracao administrativa e Firebase.
+
+- Garante `tiagov.bento@gmail.com` como conta administrativa principal via migration idempotente.
+- Mantem a tela `/settings/users` visivel para a conta principal e funcional para vincular contas como parceiros.
+- Evita que a propria conta admin apareca como candidata a parceiro.
+- Adiciona script `scripts/configure-firebase-push.ps1` para validar `google-services.json` e orientar ativacao de push Firebase.
+- Mantem push nativo protegido por `NEXT_PUBLIC_ENABLE_PUSH_NOTIFICATIONS=true` e `NEXT_PUBLIC_ANDROID_FIREBASE_CONFIGURED=true`.
+
 ## v1.2.3 - 2026-07-28
 
 Correcao emergencial do APK Android.

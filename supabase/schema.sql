@@ -672,6 +672,82 @@ grant select on table public.push_notification_deliveries to authenticated;
 grant execute on function public.register_push_device_token(text, text, text) to authenticated;
 grant execute on function public.revoke_push_device_token(text) to authenticated;
 
+-- Primary admin bootstrap. Keep this block after access-control functions so it
+-- is the final definition used by new installs.
+create or replace function public.primary_admin_email()
+returns text
+language sql
+immutable
+as $$
+  select 'tiagov.bento@gmail.com'::text;
+$$;
+
+create or replace function public.is_primary_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select lower(coalesce(auth.jwt() ->> 'email', '')) = public.primary_admin_email();
+$$;
+
+create or replace function public.current_profile_role()
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select case
+    when public.is_primary_admin() then 'admin'
+    else coalesce((select role from public.profiles where id = auth.uid()), 'user')
+  end;
+$$;
+
+create or replace function public.current_profile_is_active()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select case
+    when public.is_primary_admin() then true
+    else coalesce((select active from public.profiles where id = auth.uid()), false)
+  end;
+$$;
+
+create or replace function public.is_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select public.is_primary_admin()
+    or (public.current_profile_is_active() and public.current_profile_role() = 'admin');
+$$;
+
+insert into public.profiles (id, name, email, role, active)
+select
+  u.id,
+  coalesce(u.raw_user_meta_data ->> 'name', u.email, 'Tiago'),
+  u.email,
+  'admin',
+  true
+from auth.users u
+where lower(coalesce(u.email, '')) = public.primary_admin_email()
+on conflict (id) do update set
+  email = excluded.email,
+  name = coalesce(public.profiles.name, excluded.name),
+  role = 'admin',
+  active = true,
+  updated_at = now();
+
+grant execute on function public.primary_admin_email() to authenticated;
+grant execute on function public.is_primary_admin() to authenticated;
+
 create or replace function public.seed_nova_forma_demo(target_user_id uuid default auth.uid())
 returns void
 language plpgsql

@@ -27,7 +27,7 @@ O app exige Supabase configurado. Sem as variaveis `NEXT_PUBLIC_SUPABASE_URL` e 
 1. Crie um projeto no Supabase.
 2. Abra o SQL Editor.
 3. Execute todo o arquivo `supabase/schema.sql`. Esse arquivo inclui Auth profiles, CRM, RLS, automacoes, briefing de visita e painel do parceiro.
-4. Em seguida execute, nesta ordem, `supabase/migrations/add_partner_briefing.sql`, `supabase/migrations/add_partner_notifications.sql`, `supabase/migrations/add_access_control.sql` e `supabase/migrations/add_push_notifications.sql`. Todas sao idempotentes e nao removem leads, tarefas, interacoes ou perfis.
+4. Em seguida execute, nesta ordem, `supabase/migrations/add_partner_briefing.sql`, `supabase/migrations/add_partner_notifications.sql`, `supabase/migrations/add_access_control.sql`, `supabase/migrations/add_push_notifications.sql` e `supabase/migrations/ensure_primary_admin.sql`. Todas sao idempotentes e nao removem leads, tarefas, interacoes ou perfis.
 5. Copie `.env.example` para `.env.local`.
 6. Preencha as variaveis:
 
@@ -174,7 +174,8 @@ O APK pode receber notificacoes remotas para briefing ou visita atribuidos/alter
 1. Aplique `supabase/migrations/add_push_notifications.sql` depois de `add_access_control.sql`.
 2. No Firebase, cadastre o app Android com o package `br.com.novaforma.crm` e salve o arquivo `google-services.json` em `android/app/google-services.json`. Esse arquivo e ignorado pelo Git.
 3. Mantenha `NEXT_PUBLIC_ENABLE_PUSH_NOTIFICATIONS=false` e `NEXT_PUBLIC_ANDROID_FIREBASE_CONFIGURED=false` ate o APK/AAB ser reconstruido com `google-services.json`. Ative as duas variaveis como `true` somente depois de configurar Firebase no Android.
-3. Crie uma credencial de service account do Firebase somente para o servidor e configure na Vercel, sem prefixo `NEXT_PUBLIC`:
+4. Valide o arquivo local com `powershell -ExecutionPolicy Bypass -File scripts/configure-firebase-push.ps1`. Use `-BuildRelease` no final para gerar uma release ja sincronizada com Firebase.
+5. Crie uma credencial de service account do Firebase somente para o servidor e configure na Vercel, sem prefixo `NEXT_PUBLIC`:
 
 ```env
 SUPABASE_SERVICE_ROLE_KEY=sua-chave-service-role
@@ -182,8 +183,8 @@ PUSH_WEBHOOK_SECRET=segredo-longo-e-aleatorio
 FIREBASE_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
 ```
 
-4. No Supabase Dashboard, crie uma **Database Webhook** para `INSERT` na tabela `partner_notifications`, apontando para `https://nova-forma-crm.vercel.app/api/internal/push/partner-notification`. Adicione o header `x-push-webhook-secret` com o mesmo valor de `PUSH_WEBHOOK_SECRET`.
-5. Refaça o build do APK apos adicionar o `google-services.json`; no Android 13 ou superior, aceite a permissao de notificacoes ao entrar no CRM.
+6. No Supabase Dashboard, crie uma **Database Webhook** para `INSERT` na tabela `partner_notifications`, apontando para `https://nova-forma-crm.vercel.app/api/internal/push/partner-notification`. Adicione o header `x-push-webhook-secret` com o mesmo valor de `PUSH_WEBHOOK_SECRET`.
+7. Refaça o build do APK apos adicionar o `google-services.json`; no Android 13 ou superior, aceite a permissao de notificacoes ao entrar no CRM.
 
 Sem essas configuracoes externas, o CRM continua funcional com avisos internos, mas o Android nao recebe push remoto.
 Sem Firebase no APK, deixar push nativo ativo pode impedir o registro correto; por isso o padrao seguro e manter `NEXT_PUBLIC_ENABLE_PUSH_NOTIFICATIONS=false` e `NEXT_PUBLIC_ANDROID_FIREBASE_CONFIGURED=false`.

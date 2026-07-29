@@ -27,6 +27,7 @@ describe("access control helpers", () => {
     ];
 
     expect(getEligiblePartnerAccounts(profiles).map((profile) => profile.id)).toEqual(["admin-1", "user-1"]);
+    expect(getEligiblePartnerAccounts(profiles, "admin-1").map((profile) => profile.id)).toEqual(["user-1"]);
     expect(getLinkedPartnerAccounts(profiles).map((profile) => profile.id)).toEqual(["partner-1"]);
     expect(buildPartnerAccountLink(profiles[1])).toMatchObject({
       target_user_id: "user-1",

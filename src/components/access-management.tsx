@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Check, Link2, KeyRound, Loader2, Search, ShieldCheck, UserCheck, UserPlus, UsersRound } from "lucide-react";
 import { toast } from "sonner";
+import { isPrimaryAdminProfile } from "@/lib/admin-identity";
 import { accessPresets, buildPartnerAccountLink, formatPermissionOverrides, getEligiblePartnerAccounts, getLinkedPartnerAccounts, getPresetForRole, profileRoleLabel, type PermissionDefinition, type UserPermissionOverride } from "@/lib/access-control";
 import { supabase } from "@/lib/supabase/client";
 import type { Lead, Profile, ProfileRole } from "@/lib/types";
@@ -52,9 +53,10 @@ export function AccessManagement({ profiles, leads, currentProfile, onChanged }:
     setLoadingDetails(true);
     try {
       const { data: allowed, error: permissionError } = await supabase.rpc("has_permission", { permission_name: "users.manage" });
-      if (permissionError) throw permissionError;
-      setCanManage(Boolean(allowed));
-      if (!allowed) return;
+      if (permissionError && !isPrimaryAdminProfile(currentProfile)) throw permissionError;
+      const canManageUsers = Boolean(allowed) || isPrimaryAdminProfile(currentProfile);
+      setCanManage(canManageUsers);
+      if (!canManageUsers) return;
 
       const [permissionResult, overrideResult, auditResult] = await Promise.all([
         supabase.from("permissions").select("key, label, category, description").order("category").order("label"),
@@ -73,14 +75,14 @@ export function AccessManagement({ profiles, leads, currentProfile, onChanged }:
     } finally {
       setLoadingDetails(false);
     }
-  }, []);
+  }, [currentProfile]);
 
   React.useEffect(() => {
     void load();
   }, [load]);
 
   const selected = profiles.find((profile) => profile.id === selectedId) ?? null;
-  const eligiblePartnerAccounts = getEligiblePartnerAccounts(profiles);
+  const eligiblePartnerAccounts = getEligiblePartnerAccounts(profiles, currentProfile?.id);
   const linkedPartnerAccounts = getLinkedPartnerAccounts(profiles);
   const filteredProfiles = profiles.filter((profile) => {
     const matchesQuery = `${profile.name ?? ""} ${profile.email ?? ""}`.toLowerCase().includes(query.toLowerCase());

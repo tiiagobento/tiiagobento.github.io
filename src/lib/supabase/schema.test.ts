@@ -6,6 +6,7 @@ const schema = readFileSync(resolve(process.cwd(), "supabase/schema.sql"), "utf8
 const partnerNotificationsMigration = readFileSync(resolve(process.cwd(), "supabase/migrations/add_partner_notifications.sql"), "utf8");
 const accessControlMigration = readFileSync(resolve(process.cwd(), "supabase/migrations/add_access_control.sql"), "utf8");
 const pushNotificationsMigration = readFileSync(resolve(process.cwd(), "supabase/migrations/add_push_notifications.sql"), "utf8");
+const primaryAdminMigration = readFileSync(resolve(process.cwd(), "supabase/migrations/ensure_primary_admin.sql"), "utf8");
 
 describe("Supabase interaction follow-up trigger", () => {
   it("creates the follow-up task after a new interaction with a next contact", () => {
@@ -79,5 +80,18 @@ describe("Supabase Android push notification migration", () => {
     expect(pushNotificationsMigration).toContain("partner_feedback_received");
     expect(pushNotificationsMigration).toContain("status in ('pending', 'sending', 'sent', 'failed', 'skipped')");
     expect(pushNotificationsMigration).not.toMatch(/drop\s+table|truncate\s+table|delete\s+from\s+public\.(leads|profiles|tasks|interactions)/i);
+  });
+});
+
+describe("Supabase primary admin bootstrap", () => {
+  it("keeps Tiago's account administrative without deleting CRM data", () => {
+    expect(primaryAdminMigration).toContain("tiagov.bento@gmail.com");
+    expect(primaryAdminMigration).toContain("create or replace function public.is_primary_admin()");
+    expect(primaryAdminMigration).toContain("create or replace function public.current_profile_role()");
+    expect(primaryAdminMigration).toContain("insert into public.profiles");
+    expect(primaryAdminMigration).toContain("role = 'admin'");
+    expect(schema).toContain("create or replace function public.primary_admin_email()");
+    expect(schema).toContain("tiagov.bento@gmail.com");
+    expect(primaryAdminMigration).not.toMatch(/drop\s+table|truncate\s+table|delete\s+from\s+public\.(leads|profiles|tasks|interactions)/i);
   });
 });

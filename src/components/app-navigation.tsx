@@ -7,6 +7,7 @@ import { ClipboardList, Columns3, FileUp, LayoutDashboard, LogOut, MessageSquare
 import { clearOfflineDbForUser } from "@/lib/offline/db";
 import { clearPrivateRuntimeCache } from "@/lib/offline/pwa-cache";
 import { revokeCurrentPushDeviceToken } from "@/lib/push/client";
+import { isPrimaryAdminEmail } from "@/lib/admin-identity";
 import { supabase } from "@/lib/supabase/client";
 import type { ProfileRole } from "@/lib/types";
 
@@ -47,6 +48,10 @@ export function useNavigationRole() {
       if (!supabase) return;
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) return;
+      if (isPrimaryAdminEmail(userData.user.email)) {
+        if (mounted) setRole("admin");
+        return;
+      }
       const { data } = await supabase.from("profiles").select("role").eq("id", userData.user.id).maybeSingle();
       if (mounted) setRole((data?.role as ProfileRole | undefined) ?? null);
     }
