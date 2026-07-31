@@ -79,6 +79,7 @@
     "vitest": "^4.1.10"
   },
   "overrides": {
+    "brace-expansion": "1.1.18",
     "postcss": "8.5.23",
     "next": {
       "sharp": "0.35.3"
