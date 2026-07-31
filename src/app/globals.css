@@ -98,8 +98,8 @@
 
 body {
   background:
-    radial-gradient(circle at top left, color-mix(in oklab, var(--primary) 8%, transparent), transparent 36rem),
-    radial-gradient(circle at top right, color-mix(in oklab, var(--accent) 7%, transparent), transparent 32rem),
+    radial-gradient(circle at top left, rgb(14 65 80 / 0.08), transparent 36rem),
+    radial-gradient(circle at top right, rgb(184 120 56 / 0.07), transparent 32rem),
     linear-gradient(180deg, var(--surface) 0%, var(--background) 34rem);
   color: var(--foreground);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -111,20 +111,20 @@ body {
 
 .dark body {
   background:
-    radial-gradient(circle at top left, color-mix(in oklab, #174250 42%, transparent), transparent 34rem),
-    radial-gradient(circle at top right, color-mix(in oklab, var(--accent) 16%, transparent), transparent 30rem),
+    radial-gradient(circle at top left, rgb(23 66 80 / 0.42), transparent 34rem),
+    radial-gradient(circle at top right, rgb(184 120 56 / 0.16), transparent 30rem),
     linear-gradient(180deg, #0a151b 0%, var(--background) 34rem);
 }
 
 .dark .premium-panel {
-  border-color: color-mix(in oklab, var(--border) 84%, transparent);
+  border-color: rgb(80 108 120 / 0.84);
   background:
-    linear-gradient(180deg, color-mix(in oklab, var(--card) 94%, #172833) 0%, color-mix(in oklab, var(--card) 88%, #091217) 100%);
+    linear-gradient(180deg, #14242d 0%, #0d1a20 100%);
   box-shadow: var(--shadow-soft);
 }
 
 .dark .premium-hover:hover {
-  border-color: color-mix(in oklab, var(--accent) 26%, var(--border));
+  border-color: rgb(184 120 56 / 0.48);
   box-shadow: var(--shadow-premium);
 }
 
@@ -141,7 +141,7 @@ body {
 }
 
 .dark .page-hero {
-  border-color: color-mix(in oklab, var(--accent) 22%, transparent);
+  border-color: rgb(184 120 56 / 0.32);
   background:
     radial-gradient(circle at top right, rgb(213 154 85 / 0.18), transparent 35%),
     linear-gradient(135deg, #0e2a35 0%, #071116 100%);
@@ -149,7 +149,7 @@ body {
 }
 
 ::selection {
-  background: color-mix(in oklab, var(--accent) 35%, transparent);
+  background: rgb(184 120 56 / 0.35);
 }
 
 button,
@@ -193,14 +193,14 @@ html {
 }
 
 :focus-visible {
-  outline: 2px solid color-mix(in oklab, var(--ring) 70%, white);
+  outline: 2px solid rgb(105 177 199 / 0.82);
   outline-offset: 2px;
 }
 
 .premium-panel {
-  border: 1px solid color-mix(in oklab, var(--border) 82%, transparent);
+  border: 1px solid rgb(215 226 232 / 0.82);
   background:
-    linear-gradient(180deg, color-mix(in oklab, var(--card) 96%, white) 0%, color-mix(in oklab, var(--card) 92%, var(--secondary)) 100%);
+    linear-gradient(180deg, #ffffff 0%, #f5f8fa 100%);
   box-shadow: var(--shadow-soft);
 }
 
@@ -214,7 +214,7 @@ html {
 
 .premium-hover:hover {
   transform: translateY(-2px);
-  border-color: color-mix(in oklab, var(--primary) 18%, var(--border));
+  border-color: rgb(14 65 80 / 0.3);
   box-shadow: var(--shadow-premium);
 }
 
@@ -224,7 +224,7 @@ html {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  box-shadow: inset 0 1px 0 color-mix(in oklab, white 45%, transparent);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.45);
 }
 
 .dark .daily-action-glow::after {
@@ -234,10 +234,10 @@ html {
 .page-hero {
   position: relative;
   overflow: hidden;
-  border-color: color-mix(in oklab, var(--primary) 18%, transparent);
+  border-color: rgb(14 65 80 / 0.3);
   background: var(--primary);
   color: var(--primary-foreground);
-  box-shadow: 0 18px 44px -30px color-mix(in oklab, var(--primary) 70%, black);
+  box-shadow: 0 18px 44px -30px rgb(14 65 80 / 0.7);
 }
 
 .page-hero::before {

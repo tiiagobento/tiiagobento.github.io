@@ -25,9 +25,11 @@ import { toast } from "sonner";
 import { AIReplyComposer } from "@/components/ai/ai-reply-composer";
 import { EmptyState } from "@/components/empty-state";
 import { InteractionTimeline } from "@/components/interaction-timeline";
+import { LeadFiles } from "@/components/lead-files";
 import { LeadForm } from "@/components/lead-form";
 import { LeadPriorityBadge, LeadScoreBadge, LeadStatusBadge } from "@/components/lead-badges";
 import { LoadingSkeleton } from "@/components/loading-skeleton";
+import { PartnerCommissionCard } from "@/components/partner-commission-card";
 import { WhatsAppButton } from "@/components/whatsapp-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -221,6 +223,11 @@ export default function LeadDetailPage() {
         <PartnerAssignmentPanel lead={lead} partners={profiles.filter((profile) => profile.role === "partner")} onUpdate={(input) => updateLead(lead.id, input)} />
       ) : null}
 
+      <section className="grid gap-4 xl:grid-cols-[1.1fr_.9fr]">
+        <LeadFiles leadId={lead.id} />
+        <PartnerCommissionCard lead={lead} role={currentProfile?.role} />
+      </section>
+
       <section className="grid gap-4 xl:grid-cols-3">
         <InfoCard title="Dados do cliente" icon={UserRound}>
           <InfoGrid>
@@ -384,6 +391,12 @@ function LeadHeader({ lead, onEdit }: { lead: Lead; onEdit: () => void }) {
                 <Link href={`/leads/${lead.id}/briefing`}>
                   <FileText className="size-4" />
                   Gerar briefing para visita
+                </Link>
+              </Button>
+              <Button asChild variant="secondary" size="lg">
+                <Link href={`/estimates/new?leadId=${lead.id}`}>
+                  <FileText className="size-4" />
+                  Criar orcamento
                 </Link>
               </Button>
               <Button asChild variant="secondary" size="lg">

@@ -9,6 +9,7 @@ Importante:
 - nao coloque segredo em `.env.example`
 - guarde a keystore em local seguro e com backup
 - se perder a keystore, voce pode perder a capacidade de atualizar o app publicado
+- uma nova keystore nao consegue atualizar um APK ja instalado e assinado por outra chave; nesse caso, desinstale a versao antiga antes da instalacao limpa
 
 ## Pre-requisitos
 

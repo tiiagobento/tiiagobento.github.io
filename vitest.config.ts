@@ -19,11 +19,13 @@ export default defineConfig({
     include: ["src/**/*.test.{ts,tsx}"],
     exclude: ["node_modules", ".next", "e2e"],
     css: true,
-    // Preserve module isolation between route and UI suites. This avoids mock
-    // state leaking between authorization tests on Windows.
+    // Reuse the worker on Windows. Spawning a fork for every test file made the
+    // complete suite exceed the CI timeout; route authorization mocks share an
+    // explicit resettable test state instead of depending on module isolation.
     pool: "forks",
     fileParallelism: false,
     maxWorkers: 1,
+    isolate: false,
     testTimeout: 120_000,
     hookTimeout: 120_000,
   },

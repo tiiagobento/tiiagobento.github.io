@@ -7,8 +7,10 @@ import { ptBR } from "date-fns/locale";
 import { BellRing, CalendarCheck, ClipboardCheck, ExternalLink, MessageSquareText, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/empty-state";
+import { LeadFiles } from "@/components/lead-files";
 import { LeadPriorityBadge, LeadScoreBadge } from "@/components/lead-badges";
 import { LoadingSkeleton } from "@/components/loading-skeleton";
+import { PartnerCommissionCard } from "@/components/partner-commission-card";
 import { WhatsAppButton } from "@/components/whatsapp-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -138,7 +140,11 @@ export default function PartnerPage() {
         </Card>
 
         {selectedLead ? (
-          <PartnerFeedbackCard lead={selectedLead} onSave={(input) => saveFeedback(selectedLead, input)} />
+          <div className="space-y-4">
+            <PartnerFeedbackCard lead={selectedLead} onSave={(input) => saveFeedback(selectedLead, input)} />
+            <PartnerCommissionCard lead={selectedLead} role={currentProfile?.role} />
+            <LeadFiles leadId={selectedLead.id} compact />
+          </div>
         ) : (
           <EmptyState icon={ClipboardCheck} title="Sem lead selecionado" description="Selecione um lead atribuido para registrar retorno de visita." />
         )}
@@ -219,6 +225,10 @@ function PartnerFeedbackCard({ lead, onSave }: { lead: Lead; onSave: (input: Pic
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    if (visitStatus === "Visita realizada" && !feedback.trim()) {
+      toast.error("Preencha o resumo final da visita antes de concluir.");
+      return;
+    }
     setSaving(true);
     try {
       const composedFeedback = [
@@ -299,8 +309,8 @@ function PartnerFeedbackCard({ lead, onSave }: { lead: Lead; onSave: (input: Pic
           <Field label="Proxima acao sugerida">
             <Input value={nextAction} onChange={(event) => setNextAction(event.target.value)} placeholder="Ex: Solicitar planta atualizada" />
           </Field>
-          <Field label="Resumo final do retorno">
-            <Textarea value={feedback} onChange={(event) => setFeedback(event.target.value)} placeholder="Resumo para o time comercial" />
+          <Field label={visitStatus === "Visita realizada" ? "Resumo final do retorno (obrigatorio)" : "Resumo final do retorno"}>
+            <Textarea value={feedback} onChange={(event) => setFeedback(event.target.value)} placeholder="Resumo para o time comercial" required={visitStatus === "Visita realizada"} />
           </Field>
           <Button disabled={saving} className="w-full">
             {saving ? "Salvando..." : "Registrar retorno"}

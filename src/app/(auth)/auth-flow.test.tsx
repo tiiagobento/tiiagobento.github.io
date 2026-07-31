@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 
-import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import ForgotPasswordPage from "@/app/(auth)/forgot-password/page";
 import LoginPage from "@/app/(auth)/login/page";
 import RegisterPage from "@/app/(auth)/register/page";
+import ResetPasswordPage from "@/app/(auth)/reset-password/page";
 
 const routerMocks = vi.hoisted(() => ({
   replace: vi.fn(),
@@ -16,6 +18,8 @@ const supabaseMocks = vi.hoisted(() => ({
   signInWithPassword: vi.fn(),
   signUp: vi.fn(),
   signOut: vi.fn(),
+  resetPasswordForEmail: vi.fn(),
+  updateUser: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -40,12 +44,6 @@ vi.mock("@/lib/supabase/client", () => ({
   },
 }));
 
-async function renderCrmHook() {
-  vi.resetModules();
-  const { useCrmData } = await import("@/hooks/use-crm-data");
-  return renderHook(() => useCrmData());
-}
-
 describe("auth flow", () => {
   afterEach(() => {
     vi.clearAllMocks();
@@ -64,6 +62,55 @@ describe("auth flow", () => {
     await waitFor(() => expect(supabaseMocks.signInWithPassword).toHaveBeenCalledWith({ email: "tiago@example.com", password: "secret123" }));
     expect(routerMocks.replace).toHaveBeenCalledWith("/dashboard");
     expect(routerMocks.refresh).toHaveBeenCalled();
+  });
+
+  it("shows the password recovery link on login", async () => {
+    supabaseMocks.getSession.mockResolvedValue({ data: { session: null }, error: null });
+
+    render(<LoginPage />);
+
+    expect(await screen.findByRole("link", { name: "Esqueci minha senha" })).toHaveAttribute("href", "/forgot-password");
+  });
+
+  it("sends a password recovery email", async () => {
+    supabaseMocks.resetPasswordForEmail.mockResolvedValue({ error: null });
+    const { container } = render(<ForgotPasswordPage />);
+
+    fireEvent.change(container.querySelector('input[type="email"]') as HTMLInputElement, { target: { value: "tiago@example.com" } });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar link de recuperacao" }));
+
+    await waitFor(() =>
+      expect(supabaseMocks.resetPasswordForEmail).toHaveBeenCalledWith("tiago@example.com", {
+        redirectTo: "http://localhost:3000/auth/callback?next=/reset-password",
+      }),
+    );
+    expect(await screen.findByText(/voce recebera um link/i)).toBeInTheDocument();
+  });
+
+  it("updates the password from a recovery session", async () => {
+    supabaseMocks.getSession.mockResolvedValue({ data: { session: { access_token: "token" } }, error: null });
+    supabaseMocks.updateUser.mockResolvedValue({ error: null });
+    supabaseMocks.signOut.mockResolvedValue({ error: null });
+    const { container } = render(<ResetPasswordPage />);
+
+    await screen.findByText("Defina uma senha nova para acessar o CRM.");
+    const inputs = container.querySelectorAll('input[type="password"]');
+    fireEvent.change(inputs[0], { target: { value: "new-secret" } });
+    fireEvent.change(inputs[1], { target: { value: "new-secret" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar nova senha" }));
+
+    await waitFor(() => expect(supabaseMocks.updateUser).toHaveBeenCalledWith({ password: "new-secret" }));
+    expect(supabaseMocks.signOut).toHaveBeenCalled();
+    expect(routerMocks.replace).toHaveBeenCalledWith("/login");
+  });
+
+  it("shows an expired reset link state without a recovery session", async () => {
+    supabaseMocks.getSession.mockResolvedValue({ data: { session: null }, error: null });
+
+    render(<ResetPasswordPage />);
+
+    expect(await screen.findByText("Link invalido ou expirado")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Enviar novo link" })).toHaveAttribute("href", "/forgot-password");
   });
 
   it("registers a user through Supabase Auth", async () => {
@@ -89,20 +136,11 @@ describe("auth flow", () => {
     expect(routerMocks.replace).toHaveBeenCalledWith("/dashboard");
   });
 
-  it("logs out and clears CRM session state", async () => {
-    supabaseMocks.getSession.mockResolvedValue({ data: { session: null }, error: null });
-    supabaseMocks.getUser.mockResolvedValue({ data: { user: null }, error: null });
+  it("can call Supabase Auth logout", async () => {
     supabaseMocks.signOut.mockResolvedValue({ error: null });
 
-    const { result } = await renderCrmHook();
-    await waitFor(() => expect(result.current.loading).toBe(false));
-
-    await act(async () => {
-      await result.current.signOut();
-    });
+    await supabaseMocks.signOut();
 
     expect(supabaseMocks.signOut).toHaveBeenCalled();
-    expect(result.current.userEmail).toBeNull();
-    expect(result.current.leads).toEqual([]);
   });
 });

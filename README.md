@@ -27,7 +27,7 @@ O app exige Supabase configurado. Sem as variaveis `NEXT_PUBLIC_SUPABASE_URL` e 
 1. Crie um projeto no Supabase.
 2. Abra o SQL Editor.
 3. Execute todo o arquivo `supabase/schema.sql`. Esse arquivo inclui Auth profiles, CRM, RLS, automacoes, briefing de visita e painel do parceiro.
-4. Em seguida execute, nesta ordem, `supabase/migrations/add_partner_briefing.sql`, `supabase/migrations/add_partner_notifications.sql`, `supabase/migrations/add_access_control.sql`, `supabase/migrations/add_push_notifications.sql` e `supabase/migrations/ensure_primary_admin.sql`. Todas sao idempotentes e nao removem leads, tarefas, interacoes ou perfis.
+4. Em seguida execute, nesta ordem, `supabase/migrations/add_partner_briefing.sql`, `supabase/migrations/add_partner_notifications.sql`, `supabase/migrations/add_access_control.sql`, `supabase/migrations/add_push_notifications.sql`, `supabase/migrations/ensure_primary_admin.sql`, `supabase/migrations/add_partner_commissions_and_lead_files.sql`, `supabase/migrations/add_permission_audit_details.sql` e `supabase/migrations/add_steel_frame_estimates.sql`. Todas sao idempotentes e nao removem leads, tarefas, interacoes ou perfis.
 5. Copie `.env.example` para `.env.local`.
 6. Preencha as variaveis:
 
@@ -66,6 +66,9 @@ O SQL cria:
 - `message_templates`
 - campos de parceiro/Bruno em `leads`
 - RPC segura `partner_update_visit_feedback`
+- `partner_commissions` para o controle auditavel de repasse de 5%
+- `lead_files` e bucket privado `lead-files` para plantas, orcamentos, fotos e comprovantes
+- base auditavel de orcamentos Steel Frame, versoes, documentos privados, catalogo e precificacao em `steel_frame_*`
 
 Todas as tabelas usam Row Level Security. Usuario comum ve e altera apenas os proprios dados. Admin com `profiles.role = 'admin'` consegue operar o CRM. Parceiro com `profiles.role = 'partner'` ve apenas leads atribuidos em `leads.partner_id` e registra retorno pela RPC segura. A migration de controle de acesso acrescenta conjuntos por papel, excecoes individuais, status ativo/inativo e auditoria administrativa; ela tambem impede a elevacao do proprio papel pelo frontend.
 
@@ -167,6 +170,14 @@ where email = 'email-do-bruno@exemplo.com';
 
 Para atribuir uma visita, edite um lead como admin e preencha parceiro, data/status da visita e observacoes. Bruno ou Rafael acessam `/partner`, abrem somente os briefings atribuidos a cada conta e registram o retorno. O admin ve o retorno na ficha do lead e a alteracao fica na auditoria.
 
+## Fechamento, repasse e anexos
+
+Depois de uma visita, o parceiro precisa registrar o resumo final antes de marcar a visita como realizada. Cada atualizacao gera uma notificacao para o responsavel pelo lead no CRM e, com push configurado, no Android.
+
+Quando o parceiro fechar a obra, ele informa o valor final, a data e a referencia do repasse. O banco calcula exatamente **5%** para a Nova Forma, marca o repasse como pendente ou informado e notifica o administrador. O administrador confirma o recebimento; o CRM nao movimenta dinheiro nem faz pagamento automatico.
+
+Na ficha do lead e no painel do parceiro existe a area **Arquivos do lead**. Ela aceita PDF, JPG, PNG, WEBP, DOC e DOCX de ate 15 MB cada. O bucket `lead-files` e privado: somente o dono do lead, o parceiro atribuido ou um administrador conseguem abrir o arquivo com URL temporaria.
+
 ## Notificacoes push Android
 
 O APK pode receber notificacoes remotas para briefing ou visita atribuidos/alterados para um parceiro e para retornos de visita enviados pelo parceiro ao responsavel pelo lead. A notificacao abre o briefing ou a ficha correspondente; ela nao envia WhatsApp nem altera dados por conta propria.
@@ -205,6 +216,10 @@ Aplicacao: `https://nova-forma-crm.vercel.app`
 Nao use GitHub Pages: este projeto depende dos recursos de runtime do Next.js e do Supabase Auth.
 
 Guia completo: `docs/DEPLOY.md`.
+
+## Orcamentos Steel Frame
+
+O alicerce seguro do modulo de orcamentos esta em `supabase/migrations/add_steel_frame_estimates.sql` e `src/lib/steel-frame`. Ele inclui RLS, versoes, arquivos privados, catalogo parametrico, motor de quantidades, precificacao explicavel e proposta PDF interna vinculada a uma versao aprovada, sem fixar regras tecnicas ou custos no codigo. Veja `docs/STEEL_FRAME_ESTIMATES.md` antes de aplicar a migration.
 
 ## Scripts
 

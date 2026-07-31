@@ -17,6 +17,7 @@ const supabaseMocks = vi.hoisted(() => ({
   getUser: vi.fn(),
   getSession: vi.fn(),
   maybeSingle: vi.fn(),
+  rpc: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -37,6 +38,10 @@ vi.mock("sonner", () => ({
     success: vi.fn(),
     error: vi.fn(),
   },
+}));
+
+vi.mock("@/components/notification-center", () => ({
+  NotificationCenter: () => null,
 }));
 
 vi.mock("@/lib/offline/db", () => ({
@@ -62,6 +67,7 @@ vi.mock("@/lib/supabase/client", () => ({
         }),
       }),
     }),
+    rpc: supabaseMocks.rpc,
   },
 }));
 
@@ -71,6 +77,7 @@ describe("app navigation", () => {
     supabaseMocks.getUser.mockResolvedValue({ data: { user: { id: "user-1" } }, error: null });
     supabaseMocks.getSession.mockResolvedValue({ data: { session: { user: { id: "user-1" } } }, error: null });
     supabaseMocks.maybeSingle.mockResolvedValue({ data: { role: "admin" }, error: null });
+    supabaseMocks.rpc.mockResolvedValue({ data: true, error: null });
     supabaseMocks.signOut.mockResolvedValue({ error: null });
   });
 
@@ -104,7 +111,7 @@ describe("app navigation", () => {
   it("renders Android-style bottom navigation and exposes more actions", async () => {
     render(<MobileBottomNav />);
 
-    expect(screen.getByRole("link", { name: "Inicio" })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Inicio" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Leads" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Pipeline" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Tarefas" })).toBeInTheDocument();
@@ -122,6 +129,19 @@ describe("app navigation", () => {
     const labels = getVisibleNavigationItems("partner").map((item) => item.label);
 
     expect(labels).toEqual(["Parceiros"]);
+  });
+
+  it("shows a partner only the destinations granted by the administrator", () => {
+    const labels = getVisibleNavigationItems("partner", ["leads.view_assigned", "tasks.view_assigned"]).map((item) => item.label);
+
+    expect(labels).toEqual(["Leads", "Pipeline", "Tarefas", "Parceiros"]);
+    expect(labels).not.toContain("Novo lead");
+    expect(labels).not.toContain("Configuracoes");
+  });
+
+  it("keeps the estimate area hidden from a partner until an explicit estimate permission is granted", () => {
+    expect(getVisibleNavigationItems("partner", ["leads.view_assigned"]).map((item) => item.label)).not.toContain("Orcamentos");
+    expect(getVisibleNavigationItems("partner", ["estimates.view_assigned"]).map((item) => item.label)).toContain("Orcamentos");
   });
 
   it("only exposes the user management route to administrators", () => {

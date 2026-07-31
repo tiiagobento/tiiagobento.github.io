@@ -22,5 +22,13 @@ export function getAuthErrorMessage(error: unknown, fallback: string) {
     return "Use uma senha mais forte, com pelo menos 6 caracteres.";
   }
 
+  if (normalized.includes("same password")) {
+    return "A nova senha precisa ser diferente da senha atual.";
+  }
+
+  if (normalized.includes("session") || normalized.includes("jwt")) {
+    return "Sua sessao expirou. Solicite um novo link de recuperacao.";
+  }
+
   return message;
 }

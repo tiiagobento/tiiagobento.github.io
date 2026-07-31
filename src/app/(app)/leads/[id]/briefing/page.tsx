@@ -6,7 +6,7 @@ import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ArrowLeft, MessageCircle, UserRound } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
-import { LeadBriefingActions } from "@/components/lead-briefing-actions";
+import { LeadBriefingActions, type VisitBriefingPdfData } from "@/components/lead-briefing-actions";
 import { LeadPriorityBadge, LeadScoreBadge, LeadStatusBadge } from "@/components/lead-badges";
 import { LoadingSkeleton } from "@/components/loading-skeleton";
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,54 @@ export default function LeadBriefingPage() {
 
   const leadInteractions = interactions.filter((item) => item.lead_id === lead.id).slice(0, 6);
   const whatsappUrl = buildWhatsAppUrl(lead.phone);
+  const briefing: VisitBriefingPdfData = {
+    leadName: lead.name,
+    generatedAt: format(new Date(), "dd/MM/yyyy HH:mm", { locale: ptBR }),
+    responsible: lead.assigned_to || "A confirmar",
+    partner: lead.partner_name || "A confirmar",
+    visit: [
+      { label: "Data e horario", value: lead.visit_scheduled_at ? formatDateTime(lead.visit_scheduled_at) : "A definir" },
+      { label: "Status da visita", value: lead.visit_status || "Aguardando agendamento" },
+      { label: "Parceiro/visitante", value: lead.partner_name || "A confirmar" },
+      { label: "Responsavel interno", value: lead.assigned_to || "A confirmar" },
+    ],
+    customer: [
+      { label: "Nome", value: lead.name },
+      { label: "Telefone/WhatsApp", value: lead.phone },
+      { label: "E-mail", value: lead.email || "A confirmar" },
+      { label: "Melhor horario", value: lead.best_contact_time || "A confirmar" },
+      { label: "Cidade", value: lead.city || "A confirmar" },
+      { label: "Bairro", value: lead.neighborhood || "A confirmar" },
+      { label: "Endereco aproximado", value: lead.approximate_address || "A confirmar" },
+    ],
+    project: [
+      { label: "Tipo de obra", value: lead.project_type || "A confirmar" },
+      { label: "Interesse", value: lead.interest_type || "A confirmar" },
+      { label: "Metragem aproximada", value: lead.approximate_area ? `${lead.approximate_area} m2` : "A confirmar" },
+      { label: "Possui terreno", value: booleanLabel(lead.has_land) },
+      { label: "Possui planta/projeto", value: booleanLabel(lead.has_blueprint) },
+      { label: "Orcamento anterior", value: booleanLabel(lead.has_previous_quote) },
+      { label: "Prazo desejado", value: lead.desired_start_time || "A confirmar" },
+      { label: "Faixa de orcamento", value: lead.budget_range || "A confirmar" },
+    ],
+    commercial: [
+      { label: "Origem", value: lead.source },
+      { label: "Primeiro contato", value: formatDateOnly(lead.first_contact_date) },
+      { label: "Status", value: lead.status },
+      { label: "Prioridade", value: lead.priority },
+      { label: "Score", value: String(lead.lead_score) },
+      { label: "Valor potencial", value: formatCurrency(lead.potential_value) },
+    ],
+    visitSummary: buildVisitSummary(lead),
+    checklist: visitChecklist,
+    history: leadInteractions.map((interaction) => ({
+      date: format(parseISO(interaction.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR }),
+      type: interaction.interaction_type,
+      description: interaction.description,
+      nextStep: interaction.next_step,
+    })),
+    internalNotes: lead.partner_notes || lead.notes || "Sem observacoes internas registradas.",
+  };
 
   return (
     <div className="mx-auto max-w-5xl space-y-5 print:max-w-none print:bg-white">
@@ -53,7 +101,7 @@ export default function LeadBriefingPage() {
             Voltar para o lead
           </Link>
         </Button>
-        <LeadBriefingActions leadId={lead.id} leadName={lead.name} />
+        <LeadBriefingActions leadId={lead.id} leadName={lead.name} briefing={briefing} />
         <Button asChild variant="accent">
           <a href={whatsappUrl || "#"} target="_blank" rel="noreferrer">
             <MessageCircle className="size-4" />
@@ -74,8 +122,8 @@ export default function LeadBriefingPage() {
             </div>
             <div className="rounded-xl border border-white/10 bg-white/10 p-4 text-sm shadow-sm backdrop-blur print:border print:bg-white">
               <p>Gerado em: {format(new Date(), "dd/MM/yyyy HH:mm", { locale: ptBR })}</p>
-              <p>Responsavel interno: {lead.assigned_to || "Tiago"}</p>
-              <p>Parceiro/visitante: {lead.partner_name || "Bruno"}</p>
+              <p>Responsavel interno: {lead.assigned_to || "A confirmar"}</p>
+              <p>Parceiro/visitante: {lead.partner_name || "A confirmar"}</p>
             </div>
           </div>
           </div>
@@ -191,6 +239,12 @@ function buildVisitSummary(lead: Lead) {
   const area = lead.approximate_area ? `metragem aproximada de ${lead.approximate_area} m2` : "metragem ainda nao confirmada";
   const interest = lead.interest_type || lead.project_type || "construcao em steel frame";
   return `Cliente interessado em ${interest} em ${place}. ${blueprint}, ${land} e ${area}. Recomenda-se confirmar metragem, padrao de acabamento, acesso ao terreno, restricoes do local, expectativa de prazo e se busca obra completa ou etapa especifica.`;
+}
+
+function booleanLabel(value: boolean | null | undefined) {
+  if (value === true) return "Sim";
+  if (value === false) return "Nao";
+  return "A confirmar";
 }
 
 function formatDateOnly(value: string) {

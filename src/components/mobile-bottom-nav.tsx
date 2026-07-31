@@ -4,49 +4,29 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  ClipboardList,
-  Columns3,
-  FileUp,
-  LayoutDashboard,
   LogOut,
-  MessageSquareText,
   MoreHorizontal,
-  Plus,
-  Settings,
-  Sparkles,
-  UserCheck,
-  Users,
 } from "lucide-react";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { OfflineStatus } from "@/components/offline-status";
-import { isNavigationItemActive, useLogout, useNavigationRole } from "@/components/app-navigation";
+import { getVisibleNavigationItems, isNavigationItemActive, type NavigationItem, useLogout, useNavigationAccess } from "@/components/app-navigation";
 import { cn } from "@/lib/utils";
 
-const primaryItems = [
-  { href: "/dashboard", label: "Inicio", icon: LayoutDashboard },
-  { href: "/leads", label: "Leads", icon: Users },
-  { href: "/pipeline", label: "Pipeline", icon: Columns3 },
-  { href: "/tasks", label: "Tarefas", icon: ClipboardList },
-];
-
-const moreItems = [
-  { href: "/leads/new", label: "Novo lead", icon: Plus },
-  { href: "/templates", label: "Templates", icon: MessageSquareText },
-  { href: "/leads/ai-import", label: "Importar com IA", icon: Sparkles },
-  { href: "/partner", label: "Parceiro", icon: UserCheck },
-  { href: "/import-export", label: "Importar/Exportar", icon: FileUp },
-  { href: "/settings", label: "Configuracoes", icon: Settings },
-];
+const mobilePrimaryHrefs = new Set(["/dashboard", "/leads", "/pipeline", "/tasks", "/partner"]);
+type MobileNavigationItem = NavigationItem & { label: string };
 
 export function MobileBottomNav() {
   const pathname = usePathname();
-  const role = useNavigationRole();
+  const { role, permissions } = useNavigationAccess();
   const { logout, isLoggingOut } = useLogout();
   const [open, setOpen] = React.useState(false);
-  const partnerOnly = role === "partner";
-  const mainItems = partnerOnly ? [{ href: "/partner", label: "Parceiro", icon: UserCheck }] : primaryItems;
-  const permittedMoreItems = partnerOnly ? [{ href: "/settings", label: "Conta", icon: Settings }] : moreItems;
+  const visibleItems = getVisibleNavigationItems(role, permissions);
+  const mainItems: MobileNavigationItem[] = visibleItems
+    .filter((item) => mobilePrimaryHrefs.has(item.href))
+    .slice(0, 4)
+    .map((item) => item.href === "/dashboard" ? { ...item, label: "Inicio" } : item);
+  const permittedMoreItems = visibleItems.filter((item) => !mainItems.some((mainItem) => mainItem.href === item.href));
   const moreActive = permittedMoreItems.some((item) => isNavigationItemActive(pathname, item.href));
 
   return (
@@ -55,7 +35,7 @@ export function MobileBottomNav() {
         {mainItems.map((item) => (
           <BottomLink key={item.href} item={item} active={isNavigationItemActive(pathname, item.href)} />
         ))}
-        {!partnerOnly && mainItems.length < 4
+        {mainItems.length < 4
           ? Array.from({ length: 4 - mainItems.length }).map((_, index) => <span key={index} aria-hidden />)
           : null}
         <Dialog open={open} onOpenChange={setOpen}>
@@ -113,7 +93,7 @@ export function MobileBottomNav() {
   );
 }
 
-function BottomLink({ item, active }: { item: (typeof primaryItems)[number]; active: boolean }) {
+function BottomLink({ item, active }: { item: MobileNavigationItem; active: boolean }) {
   return (
     <Link
       href={item.href}

@@ -1,4 +1,4 @@
-const CACHE_VERSION = "nova-forma-crm-v2";
+const CACHE_VERSION = "nova-forma-crm-v3";
 const APP_SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 

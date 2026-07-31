@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { BarChart3 } from "lucide-react";
-import { getVisibleNavigationItems, useActiveNavigation, useLogout, useNavigationRole } from "@/components/app-navigation";
+import { getVisibleNavigationItems, useActiveNavigation, useLogout, useNavigationAccess } from "@/components/app-navigation";
 import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export function AppSidebar() {
-  const role = useNavigationRole();
-  const visibleItems = getVisibleNavigationItems(role);
+  const { role, permissions } = useNavigationAccess();
+  const visibleItems = getVisibleNavigationItems(role, permissions);
   const isActive = useActiveNavigation();
   const { logout, isLoggingOut, icon: LogoutIcon } = useLogout();
 

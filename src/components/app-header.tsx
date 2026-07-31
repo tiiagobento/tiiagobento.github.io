@@ -7,8 +7,9 @@ import { useTheme } from "next-themes";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { getVisibleNavigationItems, useActiveNavigation, useLogout, useNavigationRole } from "@/components/app-navigation";
+import { getVisibleNavigationItems, useActiveNavigation, useLogout, useNavigationAccess } from "@/components/app-navigation";
 import { OfflineStatus } from "@/components/offline-status";
+import { NotificationCenter } from "@/components/notification-center";
 import { cn } from "@/lib/utils";
 
 const titles: Record<string, string> = {
@@ -27,8 +28,10 @@ export function AppHeader() {
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
   const title = titles[pathname] ?? "Nova Forma CRM";
-  const role = useNavigationRole();
-  const visibleItems = getVisibleNavigationItems(role);
+  const { role, permissions } = useNavigationAccess();
+  const visibleItems = getVisibleNavigationItems(role, permissions);
+  const canCreateLead = visibleItems.some((item) => item.href === "/leads/new");
+  const canUseDailyAssistant = role === "admin" || permissions.includes("*") || permissions.includes("ai.daily_plan");
   const isActive = useActiveNavigation();
   const { logout, isLoggingOut, icon: LogoutIcon } = useLogout();
 
@@ -55,22 +58,23 @@ export function AppHeader() {
         </div>
         <div className="flex items-center gap-2">
           <OfflineStatus compact />
+          <NotificationCenter />
           <Button variant="outline" size="icon" className="size-11 min-h-11 min-w-11" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label="Alternar tema">
             <Sun className="size-4 dark:hidden" />
             <Moon className="hidden size-4 dark:block" />
           </Button>
-          <Button asChild variant="outline" className="hidden lg:inline-flex">
+          {canUseDailyAssistant ? <Button asChild variant="outline" className="hidden lg:inline-flex">
             <Link href="/dashboard#nova-forma-ia">
               <Sparkles className="size-4" />
               Assistente
             </Link>
-          </Button>
-          <Button asChild className="hidden sm:inline-flex">
+          </Button> : null}
+          {canCreateLead ? <Button asChild className="hidden sm:inline-flex">
             <Link href="/leads/new">
               <Plus className="size-4" />
               Novo lead
             </Link>
-          </Button>
+          </Button> : null}
           <Button type="button" variant="ghost" className="hidden lg:inline-flex" onClick={logout} disabled={isLoggingOut}>
             <LogoutIcon className="size-4" />
             {isLoggingOut ? "Saindo..." : "Sair"}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accessPresets, buildPartnerAccountLink, formatPermissionOverrides, getEligiblePartnerAccounts, getLinkedPartnerAccounts, getPresetForRole, profileRoleLabel } from "@/lib/access-control";
+import { accessPresets, buildPartnerAccountLink, formatAuditedPermissionChanges, formatPermissionOverrides, getEligiblePartnerAccounts, getLinkedPartnerAccounts, getPresetForRole, profileRoleLabel } from "@/lib/access-control";
 
 describe("access control helpers", () => {
   it("keeps stable presets for the supported roles", () => {
@@ -16,6 +16,13 @@ describe("access control helpers", () => {
       [{ user_id: "partner-1", permission_key: "briefings.view_assigned", allowed: true }],
       [{ key: "briefings.view_assigned", label: "Ver briefing atribuido", category: "Visitas" }],
     )).toEqual([expect.objectContaining({ label: "Ver briefing atribuido", allowed: true })]);
+  });
+
+  it("renders persisted permission audit details with human labels", () => {
+    expect(formatAuditedPermissionChanges(
+      [{ permission_key: "leads.view_assigned", allowed: true }],
+      [{ key: "leads.view_assigned", label: "Ver leads atribuidos", category: "Leads" }],
+    )).toEqual([{ permission_key: "leads.view_assigned", allowed: true, label: "Ver leads atribuidos" }]);
   });
 
   it("only offers active non-partner accounts for a partner link", () => {

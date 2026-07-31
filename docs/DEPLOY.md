@@ -88,6 +88,9 @@ supabase/migrations/add_partner_notifications.sql
 supabase/migrations/add_access_control.sql
 supabase/migrations/add_push_notifications.sql
 supabase/migrations/ensure_primary_admin.sql
+supabase/migrations/add_partner_commissions_and_lead_files.sql
+supabase/migrations/add_permission_audit_details.sql
+supabase/migrations/add_steel_frame_estimates.sql
 ```
 
 ### 3. Ordem das Migrations
@@ -100,6 +103,9 @@ Instalacao nova:
 4. `supabase/migrations/add_access_control.sql`
 5. `supabase/migrations/add_push_notifications.sql`
 6. `supabase/migrations/ensure_primary_admin.sql`
+7. `supabase/migrations/add_partner_commissions_and_lead_files.sql`
+8. `supabase/migrations/add_permission_audit_details.sql`
+9. `supabase/migrations/add_steel_frame_estimates.sql`
 
 Banco existente antigo:
 
@@ -109,6 +115,9 @@ Banco existente antigo:
 4. `supabase/migrations/add_access_control.sql`, para papeis, permissoes individuais, auditoria, bloqueio de autoelevacao e cache offline seguro por acesso.
 5. `supabase/migrations/add_push_notifications.sql`, para tokens Android por usuario, fila de entrega e notificacoes remotas de briefing/retorno.
 6. `supabase/migrations/ensure_primary_admin.sql`, para garantir que `tiagov.bento@gmail.com` seja admin ativo e tenha acesso a **Usuarios e acessos**.
+7. `supabase/migrations/add_partner_commissions_and_lead_files.sql`, para fechar o fluxo de retorno de visita, controle de comissao de 5%, avisos de parceiro e anexos privados em Storage.
+8. `supabase/migrations/add_permission_audit_details.sql`, para registrar no historico administrativo as permissoes individuais antes e depois de cada alteracao de acesso.
+9. `supabase/migrations/add_steel_frame_estimates.sql`, para a base de orcamentos Steel Frame, RLS de precificacao, auditoria, versoes e bucket privado de documentos. Leia `docs/STEEL_FRAME_ESTIMATES.md` antes de aplicar.
 
 ### 4. Supabase Auth URLs
 

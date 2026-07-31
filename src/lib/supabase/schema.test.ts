@@ -5,8 +5,23 @@ import { describe, expect, it } from "vitest";
 const schema = readFileSync(resolve(process.cwd(), "supabase/schema.sql"), "utf8");
 const partnerNotificationsMigration = readFileSync(resolve(process.cwd(), "supabase/migrations/add_partner_notifications.sql"), "utf8");
 const accessControlMigration = readFileSync(resolve(process.cwd(), "supabase/migrations/add_access_control.sql"), "utf8");
+const permissionAuditMigration = readFileSync(resolve(process.cwd(), "supabase/migrations/add_permission_audit_details.sql"), "utf8");
 const pushNotificationsMigration = readFileSync(resolve(process.cwd(), "supabase/migrations/add_push_notifications.sql"), "utf8");
 const primaryAdminMigration = readFileSync(resolve(process.cwd(), "supabase/migrations/ensure_primary_admin.sql"), "utf8");
+const partnerCommissionsMigration = readFileSync(resolve(process.cwd(), "supabase/migrations/add_partner_commissions_and_lead_files.sql"), "utf8");
+const steelFrameEstimatesMigration = readFileSync(
+  resolve(process.cwd(), "supabase/migrations/add_steel_frame_estimates.sql"),
+  "utf8",
+);
+
+function getSteelFrameTriggerTargets(triggerSuffix: string) {
+  const markerIndex = steelFrameEstimatesMigration.indexOf(`target_table || '${triggerSuffix}'`);
+  const loopStart = steelFrameEstimatesMigration.lastIndexOf("foreach target_table in array array[", markerIndex);
+  const targetsStart = steelFrameEstimatesMigration.indexOf("[", loopStart);
+  const targetsEnd = steelFrameEstimatesMigration.indexOf("] loop", targetsStart);
+
+  return steelFrameEstimatesMigration.slice(targetsStart, targetsEnd);
+}
 
 describe("Supabase interaction follow-up trigger", () => {
   it("creates the follow-up task after a new interaction with a next contact", () => {
@@ -67,6 +82,12 @@ describe("Supabase access control migration", () => {
     expect(accessControlMigration).toContain('drop policy if exists "partner_notifications_select_authorized"');
     expect(accessControlMigration).toContain('drop policy if exists "permissions_select_authenticated"');
   });
+
+  it("records granted and revoked permission overrides in the administrative audit", () => {
+    expect(permissionAuditMigration).toContain("create or replace function public.admin_update_user_access");
+    expect(permissionAuditMigration).toContain("'permission_overrides', previous_overrides");
+    expect(permissionAuditMigration).toContain("'permission_overrides', applied_overrides");
+  });
 });
 
 describe("Supabase Android push notification migration", () => {
@@ -93,5 +114,78 @@ describe("Supabase primary admin bootstrap", () => {
     expect(schema).toContain("create or replace function public.primary_admin_email()");
     expect(schema).toContain("tiagov.bento@gmail.com");
     expect(primaryAdminMigration).not.toMatch(/drop\s+table|truncate\s+table|delete\s+from\s+public\.(leads|profiles|tasks|interactions)/i);
+  });
+});
+
+describe("Supabase partner commission and lead files migration", () => {
+  it("keeps the 5% commission workflow and private attachment storage additive", () => {
+    expect(partnerCommissionsMigration).toContain("create table if not exists public.partner_commissions");
+    expect(partnerCommissionsMigration).toContain("commission_rate numeric(5, 4) not null default 0.0500");
+    expect(partnerCommissionsMigration).toContain("new.commission_amount := round(new.sale_amount * new.commission_rate, 2)");
+    expect(partnerCommissionsMigration).toContain("create or replace function public.partner_submit_sale_commission");
+    expect(partnerCommissionsMigration).toContain("create or replace function public.admin_confirm_partner_commission");
+    expect(partnerCommissionsMigration).toContain("create table if not exists public.lead_files");
+    expect(partnerCommissionsMigration).toContain("insert into storage.buckets");
+    expect(partnerCommissionsMigration).toContain("create policy \"lead_files_storage_select_authorized\"");
+    expect(partnerCommissionsMigration).toContain("partner_visit_completed");
+    expect(partnerCommissionsMigration).not.toMatch(/drop\s+table|truncate\s+table|delete\s+from\s+public\.(leads|profiles|tasks|interactions)/i);
+  });
+});
+
+describe("Supabase Steel Frame estimates migration", () => {
+  it("creates the estimate domain without deleting existing CRM records", () => {
+    expect(steelFrameEstimatesMigration).toContain("create table if not exists public.steel_frame_estimates");
+    expect(steelFrameEstimatesMigration).toContain("create table if not exists public.steel_frame_estimate_versions");
+    expect(steelFrameEstimatesMigration).toContain("create table if not exists public.steel_frame_documents");
+    expect(steelFrameEstimatesMigration).toContain("create table if not exists public.steel_frame_ai_analysis_jobs");
+    expect(steelFrameEstimatesMigration).toContain("create table if not exists public.steel_frame_calculated_items");
+    expect(steelFrameEstimatesMigration).toContain("create or replace function public.create_steel_frame_estimate");
+    expect(steelFrameEstimatesMigration).toContain("create or replace function public.create_steel_frame_material");
+    expect(steelFrameEstimatesMigration).toContain("create or replace function public.approve_steel_frame_estimate");
+    expect(steelFrameEstimatesMigration).toContain("lead_id uuid references public.leads(id) on delete set null");
+    expect(steelFrameEstimatesMigration).not.toMatch(
+      /drop\s+table|truncate\s+table|delete\s+from\s+public\.(leads|profiles|tasks|interactions)/i,
+    );
+  });
+
+  it("enables RLS, keeps estimate files private, and limits financial data", () => {
+    expect(steelFrameEstimatesMigration).toContain("enable row level security");
+    expect(steelFrameEstimatesMigration).toContain("public.can_access_steel_frame_estimate");
+    expect(steelFrameEstimatesMigration).toContain("public.can_read_steel_frame_financials");
+    expect(steelFrameEstimatesMigration).toContain("'steel-frame-documents'");
+    expect(steelFrameEstimatesMigration).toContain("public = false");
+    expect(steelFrameEstimatesMigration).toContain("estimates.view_assigned");
+    expect(steelFrameEstimatesMigration).toContain("steel_frame_documents_delete_authorized");
+    expect(steelFrameEstimatesMigration).toContain("can_generate_steel_frame_proposal");
+    expect(steelFrameEstimatesMigration).toContain("is_current_steel_frame_estimate_version");
+    expect(steelFrameEstimatesMigration).toContain("mark_steel_frame_proposal_generated");
+    expect(steelFrameEstimatesMigration).toContain("document_type = 'proposal'");
+    expect(steelFrameEstimatesMigration).toContain("visibility = 'internal'");
+  });
+
+  it("audits changes and protects approved versions from later mutation", () => {
+    expect(steelFrameEstimatesMigration).toContain("audit_steel_frame_estimate_change");
+    expect(steelFrameEstimatesMigration).toContain("guard_steel_frame_version_mutation");
+    expect(steelFrameEstimatesMigration).toContain("guard_steel_frame_version_content_mutation");
+    expect(steelFrameEstimatesMigration).toContain("assign_steel_frame_current_version");
+    expect(steelFrameEstimatesMigration).toContain("set_steel_frame_updated_at");
+  });
+
+  it("only assigns and guards versioned child records", () => {
+    const assignCurrentVersionTargets = getSteelFrameTriggerTargets("_assign_current_version");
+    const updatedAtTargets = getSteelFrameTriggerTargets("_updated_at");
+    const versionGuardTargets = getSteelFrameTriggerTargets("_version_guard");
+
+    expect(assignCurrentVersionTargets).toContain("'steel_frame_documents'");
+    expect(assignCurrentVersionTargets).not.toContain("'steel_frame_ai_extractions'");
+    expect(updatedAtTargets).toContain("'steel_frame_ai_extractions'");
+    expect(versionGuardTargets).toContain("'steel_frame_ai_questions'");
+    expect(versionGuardTargets).not.toContain("'steel_frame_ai_extractions'");
+  });
+
+  it("keeps one current commercial component per estimate for safe upserts", () => {
+    expect(steelFrameEstimatesMigration).toContain(
+      "unique nulls not distinct (estimate_id, estimate_version_id, component_key)",
+    );
   });
 });

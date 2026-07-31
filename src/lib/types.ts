@@ -151,9 +151,49 @@ export type PartnerNotification = {
     | "visit_status_updated"
     | "feedback_requested"
     | "deadline_approaching"
-    | "partner_feedback_received";
+    | "partner_feedback_received"
+    | "partner_visit_reported"
+    | "partner_visit_completed"
+    | "partner_sale_reported"
+    | "partner_transfer_reported"
+    | "partner_transfer_confirmed";
   title: string;
   body?: string | null;
   read_at?: string | null;
   created_at: string;
+};
+
+export type LeadFileCategory = "Planta/projeto" | "Orcamento" | "Documento" | "Foto do local" | "Comprovante de repasse" | "Outro";
+
+export type LeadFile = {
+  id: string;
+  lead_id: string;
+  user_id: string;
+  file_name: string;
+  storage_path: string;
+  mime_type: string;
+  size_bytes: number;
+  category: LeadFileCategory;
+  created_at: string;
+};
+
+export type PartnerCommissionStatus = "awaiting_transfer" | "transfer_reported" | "confirmed" | "cancelled";
+
+export type PartnerCommission = {
+  id: string;
+  lead_id: string;
+  owner_user_id: string;
+  partner_id: string;
+  sale_amount: number;
+  commission_rate: number;
+  commission_amount: number;
+  sale_closed_at: string;
+  transfer_due_date?: string | null;
+  transfer_reference?: string | null;
+  status: PartnerCommissionStatus;
+  reported_at?: string | null;
+  confirmed_at?: string | null;
+  confirmed_by?: string | null;
+  created_at: string;
+  updated_at: string;
 };

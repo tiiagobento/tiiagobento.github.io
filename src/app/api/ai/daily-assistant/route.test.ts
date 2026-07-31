@@ -1,15 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { setTestRouteAuthorization } from "@/test/route-auth-mock";
 import { POST } from "./route";
 
 const providerMocks = vi.hoisted(() => ({ generate: vi.fn() }));
-const authorizationMocks = vi.hoisted(() => ({ allowed: true }));
 
-vi.mock("@/lib/supabase/server", () => ({
-  createSupabaseServerClient: vi.fn(async () => ({
-    auth: { getUser: vi.fn(async () => ({ data: { user: { id: "user-1" } }, error: null })) },
-    rpc: vi.fn(async () => ({ data: authorizationMocks.allowed, error: null })),
-  })),
-}));
+vi.mock("@/lib/supabase/route-auth", async () => {
+  const { getTestRouteAuthorization } = await import("@/test/route-auth-mock");
+  return { authorizeServerPermission: async () => getTestRouteAuthorization() };
+});
 
 vi.mock("@/lib/ai/provider", () => ({
   AIConfigurationError: class AIConfigurationError extends Error {},
@@ -39,7 +37,7 @@ const action = {
 describe("POST /api/ai/daily-assistant", () => {
   beforeEach(() => {
     providerMocks.generate.mockReset();
-    authorizationMocks.allowed = true;
+    setTestRouteAuthorization("authorized");
     providerMocks.generate.mockResolvedValue(JSON.stringify({
       message: "Comece pelo Carlos: ele e um lead quente aguardando resposta.",
       suggested_action_id: action.id,
@@ -84,7 +82,7 @@ describe("POST /api/ai/daily-assistant", () => {
   });
 
   it("rejects a signed-in user without the daily assistant permission", async () => {
-    authorizationMocks.allowed = false;
+    setTestRouteAuthorization("forbidden");
 
     const response = await POST(request({ mode: "welcome", actions: [action] }));
     const payload = await response.json();

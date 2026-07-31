@@ -46,6 +46,20 @@ export function formatPermissionOverrides(overrides: UserPermissionOverride[], p
   }));
 }
 
+export type AuditedPermissionChange = {
+  permission_key: string;
+  allowed: boolean;
+};
+
+/** Converts persisted audit payloads into the same human labels used by the access drawer. */
+export function formatAuditedPermissionChanges(changes: AuditedPermissionChange[] | undefined, permissions: PermissionDefinition[]) {
+  const labels = new Map(permissions.map((permission) => [permission.key, permission.label]));
+  return (changes ?? []).map((change) => ({
+    ...change,
+    label: labels.get(change.permission_key) ?? change.permission_key,
+  }));
+}
+
 /** Accounts that an administrator can safely turn into partners. */
 export function getEligiblePartnerAccounts(profiles: Profile[], currentUserId?: string | null) {
   return profiles.filter((profile) => profile.active !== false && profile.role !== "partner" && profile.id !== currentUserId);

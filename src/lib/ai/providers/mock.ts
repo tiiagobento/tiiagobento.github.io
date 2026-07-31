@@ -21,6 +21,26 @@ export function createMockProvider(): AIProvider {
         });
       }
 
+      if (input.task === "extract-estimate") {
+        return JSON.stringify({
+          summary: "Analise simulada para desenvolvimento. Revise todas as medidas antes de usar no orcamento.",
+          estimate: {
+            title: "Orcamento Steel Frame - em revisao",
+            city: null,
+            neighborhood: null,
+            approximate_address: null,
+            project_type: "Casa em steel frame",
+            standard_wall_height_meters: null,
+            expected_floors: null,
+          },
+          walls: [],
+          openings: [],
+          missing_information: ["Medidas confirmadas das paredes", "Aberturas e altura de pe direito"],
+          warnings: ["Provider mock ativo: nenhuma medida foi extraida de um documento real."],
+          confidence: 0,
+        });
+      }
+
       return JSON.stringify({
         leads: [
           {

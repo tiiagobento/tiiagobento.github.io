@@ -6,7 +6,7 @@ import { ptBR } from "date-fns/locale";
 import { Check, Link2, KeyRound, Loader2, Search, ShieldCheck, UserCheck, UserPlus, UsersRound } from "lucide-react";
 import { toast } from "sonner";
 import { isPrimaryAdminProfile } from "@/lib/admin-identity";
-import { accessPresets, buildPartnerAccountLink, formatPermissionOverrides, getEligiblePartnerAccounts, getLinkedPartnerAccounts, getPresetForRole, profileRoleLabel, type PermissionDefinition, type UserPermissionOverride } from "@/lib/access-control";
+import { accessPresets, buildPartnerAccountLink, formatAuditedPermissionChanges, formatPermissionOverrides, getEligiblePartnerAccounts, getLinkedPartnerAccounts, getPresetForRole, profileRoleLabel, type AuditedPermissionChange, type PermissionDefinition, type UserPermissionOverride } from "@/lib/access-control";
 import { supabase } from "@/lib/supabase/client";
 import type { Lead, Profile, ProfileRole } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +24,9 @@ type AuditEntry = {
   subject_user_id?: string | null;
   reason?: string | null;
   created_at: string;
+  new_values?: {
+    permission_overrides?: AuditedPermissionChange[];
+  } | null;
 };
 
 type OverrideDraft = Record<string, boolean>;
@@ -61,7 +64,7 @@ export function AccessManagement({ profiles, leads, currentProfile, onChanged }:
       const [permissionResult, overrideResult, auditResult] = await Promise.all([
         supabase.from("permissions").select("key, label, category, description").order("category").order("label"),
         supabase.from("user_permission_overrides").select("user_id, permission_key, allowed, expires_at, reason"),
-        supabase.from("admin_audit_log").select("id, action, subject_user_id, reason, created_at").order("created_at", { ascending: false }).limit(12),
+        supabase.from("admin_audit_log").select("id, action, subject_user_id, reason, new_values, created_at").order("created_at", { ascending: false }).limit(12),
       ]);
       if (permissionResult.error) throw permissionResult.error;
       if (overrideResult.error) throw overrideResult.error;
@@ -209,7 +212,7 @@ export function AccessManagement({ profiles, leads, currentProfile, onChanged }:
         </CardContent>
       </Card>
 
-      <Card><CardHeader><CardTitle>Auditoria recente</CardTitle><CardDescription>Alteracoes administrativas sem guardar senhas, tokens ou chaves.</CardDescription></CardHeader><CardContent className="space-y-2">{audits.length ? audits.map((audit) => <div key={audit.id} className="flex flex-col justify-between gap-1 rounded-lg border bg-secondary/20 p-3 text-sm sm:flex-row"><span className="font-medium">{audit.action}</span><span className="text-muted-foreground">{format(new Date(audit.created_at), "dd/MM HH:mm", { locale: ptBR })}{audit.reason ? ` - ${audit.reason}` : ""}</span></div>) : <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">Nenhuma alteracao administrativa registrada.</p>}</CardContent></Card>
+      <Card><CardHeader><CardTitle>Auditoria recente</CardTitle><CardDescription>Alteracoes administrativas sem guardar senhas, tokens ou chaves.</CardDescription></CardHeader><CardContent className="space-y-2">{audits.length ? audits.map((audit) => { const changes = formatAuditedPermissionChanges(audit.new_values?.permission_overrides, permissions); return <div key={audit.id} className="rounded-lg border bg-secondary/20 p-3 text-sm"><div className="flex flex-col justify-between gap-1 sm:flex-row"><span className="font-medium">{audit.action}</span><span className="text-muted-foreground">{format(new Date(audit.created_at), "dd/MM HH:mm", { locale: ptBR })}{audit.reason ? ` - ${audit.reason}` : ""}</span></div>{changes.length ? <div className="mt-2 flex flex-wrap gap-1">{changes.map((change) => <span key={change.permission_key} className="rounded-full border bg-background px-2 py-0.5 text-xs text-muted-foreground">{change.allowed ? "Permite" : "Nega"}: {change.label}</span>)}</div> : null}</div>; }) : <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">Nenhuma alteracao administrativa registrada.</p>}</CardContent></Card>
 
       {selected ? <UserAccessDrawer profile={selected} profiles={profiles} permissions={permissions} initialOverrides={overrides.filter((override) => override.user_id === selected.id)} currentProfile={currentProfile} onClose={() => setSelectedId(null)} onSaved={async () => { await onChanged(); await load(); setSelectedId(null); }} /> : null}
     </div>

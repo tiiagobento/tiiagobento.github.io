@@ -1,5 +1,11 @@
 # Nova Forma CRM - Product Spec
 
+## Orcamentos Steel Frame - Fundacao Segura
+
+O CRM possui a fundacao de banco e calculo deterministico para o modulo de orcamentos Steel Frame. A migration `add_steel_frame_estimates.sql` cria estimativas e versoes, documentos privados, extracoes de IA auditaveis, paredes, aberturas, materiais, precos, composicoes, custos, aprovacoes, proposta PDF interna e trilha de auditoria.
+
+O motor aceita somente parametros cadastrados e confirmados; ele nao inventa medidas, espessuras, quantidades ou precos. Valores extraidos por IA precisam manter confianca, evidencia e status de confirmacao. A proposta PDF so pode ser gerada depois da aprovacao tecnica, usa custos e percentuais salvos, fica em bucket privado e nao e visivel para parceiros sem permissao financeira. A especificacao operacional e a ordem segura de aplicacao ficam em `docs/STEEL_FRAME_ESTIMATES.md`.
+
 ## Preencher Lead com IA configuravel
 
 A rota `/leads/ai-import` permite que o usuario cole uma conversa ou envie prints de WhatsApp/Google Meu Negocio para gerar um rascunho de lead com IA.
@@ -57,7 +63,7 @@ Tambem sao exibidos:
 
 ## Entregavel de Visita e Area do Parceiro
 
-A ficha do lead permite gerar um briefing tecnico/comercial imprimivel em `/leads/[id]/briefing`. O documento usa dados reais do Supabase e foi desenhado para ser salvo como PDF pelo navegador com `window.print()`.
+A ficha do lead permite gerar um briefing tecnico/comercial imprimivel em `/leads/[id]/briefing`. O documento usa dados reais do Supabase e pode ser baixado como PDF A4 vetorial, com seções paginadas, cabeçalho de marca, checklist, historico e area de retorno para o parceiro. A opcao de impressao pelo navegador continua disponivel.
 
 ### Briefing de visita
 
@@ -86,6 +92,14 @@ A rota `/partner` e protegida por login e mostra leads atribuidos ao parceiro lo
 - lista de leads atribuidos;
 - botoes para WhatsApp, briefing e registro de retorno.
 
+### Retorno, repasse e anexos
+
+Ao concluir uma visita, o parceiro precisa preencher o resumo final. O banco aceita a atualizacao apenas do parceiro atribuido e cria uma notificacao para o responsavel comercial. A central de notificacoes do cabecalho e o push Android usam a mesma tabela `partner_notifications`, portanto nao ha um segundo canal sem rastreabilidade.
+
+Quando a obra e fechada pelo parceiro, ele registra o valor da venda, a data e a referencia do repasse. A tabela `partner_commissions` calcula 5% no banco, impede a alteracao depois da confirmacao e permite que apenas um administrador confirme o recebimento. O CRM registra o controle comercial; nenhuma transferencia de dinheiro e automatizada.
+
+O bucket privado `lead-files` armazena plantas, orcamentos, documentos, fotos e comprovantes. O Storage usa RLS: somente o dono do lead, o parceiro atribuido ou o administrador podem obter uma URL temporaria para abrir cada arquivo.
+
 O parceiro pode registrar:
 
 - status da visita;
@@ -98,7 +112,7 @@ O parceiro pode registrar:
 
 ### Banco e seguranca
 
-O arquivo `supabase/schema.sql` e a base SQL para uma instalacao nova. As migrations incrementais `supabase/migrations/add_partner_briefing.sql`, `supabase/migrations/add_partner_notifications.sql` e `supabase/migrations/add_access_control.sql` completam a versao atual sem excluir dados existentes.
+O arquivo `supabase/schema.sql` e a base SQL para uma instalacao nova. As migrations incrementais `supabase/migrations/add_partner_briefing.sql`, `supabase/migrations/add_partner_notifications.sql`, `supabase/migrations/add_access_control.sql`, `supabase/migrations/add_push_notifications.sql`, `supabase/migrations/ensure_primary_admin.sql`, `supabase/migrations/add_partner_commissions_and_lead_files.sql` e `supabase/migrations/add_permission_audit_details.sql` completam a versao atual sem excluir dados existentes.
 
 Essa camada adiciona os campos de parceiro e visita em `leads`, ajusta RLS para que admin opere o CRM e parceiro visualize apenas leads atribuidos, e cria a RPC `partner_update_visit_feedback` para atualizar somente os campos permitidos:
 
@@ -144,6 +158,8 @@ where email = 'seu-email-admin@exemplo.com';
 7. O parceiro acessa `/partner` e ve somente leads atribuidos a ele.
 8. O parceiro abre o briefing e registra retorno da visita.
 9. Admin volta ao lead e ve o retorno nos campos de parceiro.
+10. Em caso de fechamento, o parceiro informa a venda e o repasse de 5%; o admin confirma o recebimento na ficha.
+11. Admin ou parceiro anexam a planta, o orcamento, fotos ou comprovante no mesmo lead.
 
 ## Assistente de Execucao Diaria
 

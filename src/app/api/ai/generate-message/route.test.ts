@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { UNSUPPORTED_IMAGE_PROVIDER_MESSAGE } from "@/lib/ai/providers/shared";
 import { AI_REPLY_IMAGE_TOTAL_SIZE_MESSAGE } from "@/lib/ai/image-utils";
+import { setTestRouteAuthorization } from "@/test/route-auth-mock";
 import { POST } from "./route";
 
 const providerMocks = vi.hoisted(() => ({
@@ -8,16 +9,10 @@ const providerMocks = vi.hoisted(() => ({
   supportsImages: true,
 }));
 
-const authorizationMocks = vi.hoisted(() => ({ allowed: true }));
-
-vi.mock("@/lib/supabase/server", () => ({
-  createSupabaseServerClient: vi.fn(async () => ({
-    auth: {
-      getUser: vi.fn(async () => ({ data: { user: { id: "user-1" } }, error: null })),
-    },
-    rpc: vi.fn(async () => ({ data: authorizationMocks.allowed, error: null })),
-  })),
-}));
+vi.mock("@/lib/supabase/route-auth", async () => {
+  const { getTestRouteAuthorization } = await import("@/test/route-auth-mock");
+  return { authorizeServerPermission: async () => getTestRouteAuthorization() };
+});
 
 vi.mock("@/lib/ai/provider", () => ({
   AIConfigurationError: class AIConfigurationError extends Error {},
@@ -47,7 +42,7 @@ describe("POST /api/ai/generate-message", () => {
   beforeEach(() => {
     providerMocks.generate.mockReset();
     providerMocks.supportsImages = true;
-    authorizationMocks.allowed = true;
+    setTestRouteAuthorization("authorized");
     providerMocks.generate.mockResolvedValue(JSON.stringify({
       message: "Ola, Cibelle! Podemos organizar uma visita ao terreno. Qual periodo funciona melhor para voce?",
       warnings: [],
@@ -91,7 +86,7 @@ describe("POST /api/ai/generate-message", () => {
   });
 
   it("rejects a signed-in user without the AI message permission", async () => {
-    authorizationMocks.allowed = false;
+    setTestRouteAuthorization("forbidden");
 
     const response = await POST(jsonRequest(baseRequest));
     const payload = await response.json();

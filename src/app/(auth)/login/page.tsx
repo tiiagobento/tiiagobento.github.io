@@ -105,7 +105,12 @@ export default function LoginPage() {
           <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
         </div>
         <div className="space-y-2">
-          <Label>Senha</Label>
+          <div className="flex items-center justify-between gap-3">
+            <Label>Senha</Label>
+            <Link href="/forgot-password" className="text-xs font-medium text-accent hover:underline">
+              Esqueci minha senha
+            </Link>
+          </div>
           <Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required />
         </div>
         <Button className="w-full" disabled={loading}>

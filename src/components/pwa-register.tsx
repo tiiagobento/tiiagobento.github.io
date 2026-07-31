@@ -8,11 +8,12 @@ export function PwaRegister() {
     if (!("serviceWorker" in navigator) || process.env.NODE_ENV === "development") return;
 
     let cancelled = false;
-    window.addEventListener("load", () => {
+    const register = () => {
       void navigator.serviceWorker
         .register("/sw.js")
         .then((registration) => {
           if (cancelled) return;
+          void registration.update();
           registration.addEventListener("updatefound", () => {
             const worker = registration.installing;
             if (!worker) return;
@@ -26,10 +27,14 @@ export function PwaRegister() {
         .catch(() => {
           toast.error("Nao foi possivel ativar o modo offline neste dispositivo.");
         });
-    });
+    };
+
+    if (document.readyState === "complete") register();
+    else window.addEventListener("load", register, { once: true });
 
     return () => {
       cancelled = true;
+      window.removeEventListener("load", register);
     };
   }, []);
 
