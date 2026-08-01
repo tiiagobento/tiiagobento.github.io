@@ -27,7 +27,7 @@ O app exige Supabase configurado. Sem as variaveis `NEXT_PUBLIC_SUPABASE_URL` e 
 1. Crie um projeto no Supabase.
 2. Abra o SQL Editor.
 3. Execute todo o arquivo `supabase/schema.sql`. Esse arquivo inclui Auth profiles, CRM, RLS, automacoes, briefing de visita e painel do parceiro.
-4. Em seguida execute, nesta ordem, `supabase/migrations/add_partner_briefing.sql`, `supabase/migrations/add_partner_notifications.sql`, `supabase/migrations/add_access_control.sql`, `supabase/migrations/add_push_notifications.sql`, `supabase/migrations/ensure_primary_admin.sql`, `supabase/migrations/add_partner_commissions_and_lead_files.sql`, `supabase/migrations/add_permission_audit_details.sql` e `supabase/migrations/add_steel_frame_estimates.sql`. Todas sao idempotentes e nao removem leads, tarefas, interacoes ou perfis.
+4. Em seguida execute, nesta ordem, `supabase/migrations/add_partner_briefing.sql`, `supabase/migrations/add_partner_notifications.sql`, `supabase/migrations/add_access_control.sql`, `supabase/migrations/add_push_notifications.sql`, `supabase/migrations/ensure_primary_admin.sql`, `supabase/migrations/add_partner_commissions_and_lead_files.sql`, `supabase/migrations/add_permission_audit_details.sql`, `supabase/migrations/add_steel_frame_estimates.sql` e `supabase/migrations/add_steel_frame_technical_rules.sql`. Todas sao idempotentes e nao removem leads, tarefas, interacoes ou perfis.
 5. Copie `.env.example` para `.env.local`.
 6. Preencha as variaveis:
 
@@ -219,7 +219,7 @@ Guia completo: `docs/DEPLOY.md`.
 
 ## Orcamentos Steel Frame
 
-O alicerce seguro do modulo de orcamentos esta em `supabase/migrations/add_steel_frame_estimates.sql` e `src/lib/steel-frame`. Ele inclui RLS, versoes, arquivos privados, catalogo parametrico, motor de quantidades, precificacao explicavel e proposta PDF interna vinculada a uma versao aprovada, sem fixar regras tecnicas ou custos no codigo. Veja `docs/STEEL_FRAME_ESTIMATES.md` antes de aplicar a migration.
+O alicerce seguro do modulo de orcamentos esta em `supabase/migrations/add_steel_frame_estimates.sql` e `src/lib/steel-frame`. Ele inclui RLS, versoes, arquivos privados, catalogo parametrico, motor de quantidades, precificacao explicavel e proposta PDF interna vinculada a uma versao aprovada, sem fixar regras tecnicas ou custos no codigo. A migration `add_steel_frame_technical_rules.sql` acrescenta composicoes e regras versionadas, com vigencia, responsavel tecnico e classificacao auditavel. Veja `docs/STEEL_FRAME_ESTIMATES.md` e `docs/STEEL_FRAME_TECHNICAL_RULES.md` antes de aplicar as migrations.
 
 ## Scripts
 

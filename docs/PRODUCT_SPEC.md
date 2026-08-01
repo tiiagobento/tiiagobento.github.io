@@ -6,6 +6,20 @@ O CRM possui a fundacao de banco e calculo deterministico para o modulo de orcam
 
 O motor aceita somente parametros cadastrados e confirmados; ele nao inventa medidas, espessuras, quantidades ou precos. Valores extraidos por IA precisam manter confianca, evidencia e status de confirmacao. A proposta PDF so pode ser gerada depois da aprovacao tecnica, usa custos e percentuais salvos, fica em bucket privado e nao e visivel para parceiros sem permissao financeira. A especificacao operacional e a ordem segura de aplicacao ficam em `docs/STEEL_FRAME_ESTIMATES.md`.
 
+## Regras Tecnicas Versionadas
+
+A migration `add_steel_frame_technical_rules.sql` complementa os orcamentos
+com regras, composicoes e validacoes tecnicas versionadas. Ela separa norma,
+dados de fabricante, procedimento interno e decisao do responsavel tecnico em
+artefatos auditaveis, sem colocar limites estruturais fixos no codigo.
+
+Cada modelo registra fonte, versao, vigencia, responsavel tecnico, registro,
+condicoes e limites. A ficha classifica o resultado como `ORCAMENTO
+AUTOMATICO`, `ORCAMENTO PRELIMINAR` ou `REVISAO TECNICA OBRIGATORIA`; a
+classificacao automatica so confirma aderencia ao modelo aprovado e nunca
+substitui projeto estrutural ou ART. A referencia completa esta em
+`docs/STEEL_FRAME_TECHNICAL_RULES.md`.
+
 ## Preencher Lead com IA configuravel
 
 A rota `/leads/ai-import` permite que o usuario cole uma conversa ou envie prints de WhatsApp/Google Meu Negocio para gerar um rascunho de lead com IA.
@@ -112,7 +126,7 @@ O parceiro pode registrar:
 
 ### Banco e seguranca
 
-O arquivo `supabase/schema.sql` e a base SQL para uma instalacao nova. As migrations incrementais `supabase/migrations/add_partner_briefing.sql`, `supabase/migrations/add_partner_notifications.sql`, `supabase/migrations/add_access_control.sql`, `supabase/migrations/add_push_notifications.sql`, `supabase/migrations/ensure_primary_admin.sql`, `supabase/migrations/add_partner_commissions_and_lead_files.sql` e `supabase/migrations/add_permission_audit_details.sql` completam a versao atual sem excluir dados existentes.
+O arquivo `supabase/schema.sql` e a base SQL para uma instalacao nova. As migrations incrementais `supabase/migrations/add_partner_briefing.sql`, `supabase/migrations/add_partner_notifications.sql`, `supabase/migrations/add_access_control.sql`, `supabase/migrations/add_push_notifications.sql`, `supabase/migrations/ensure_primary_admin.sql`, `supabase/migrations/add_partner_commissions_and_lead_files.sql`, `supabase/migrations/add_permission_audit_details.sql`, `supabase/migrations/add_steel_frame_estimates.sql` e `supabase/migrations/add_steel_frame_technical_rules.sql` completam a versao atual sem excluir dados existentes.
 
 Essa camada adiciona os campos de parceiro e visita em `leads`, ajusta RLS para que admin opere o CRM e parceiro visualize apenas leads atribuidos, e cria a RPC `partner_update_visit_feedback` para atualizar somente os campos permitidos:
 

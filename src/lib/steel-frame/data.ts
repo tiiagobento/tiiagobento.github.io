@@ -18,6 +18,10 @@ import type {
   SteelFrameOpeningRecord,
   SteelFrameOperationalCostInput,
   SteelFrameOperationalCostRecord,
+  SteelFrameTechnicalAssessmentRecord,
+  SteelFrameTechnicalClassification,
+  SteelFrameTechnicalCompositionRecord,
+  SteelFrameTechnicalRuleRecord,
   SteelFrameWallSegmentInput,
   SteelFrameWallSegmentRecord,
 } from "./types";
@@ -29,6 +33,8 @@ import {
   steelFrameCalculatedItemSchema,
   steelFrameLaborItemSchema,
   steelFrameOperationalCostSchema,
+  steelFrameTechnicalCompositionDraftSchema,
+  steelFrameTechnicalRuleDraftSchema,
 } from "./schemas";
 
 export const steelFrameMigrationRequiredMessage =
@@ -61,7 +67,7 @@ export function getSteelFrameErrorMessage(error: unknown) {
   if (
     code === "42P01" ||
     code === "42883" ||
-    /steel_frame_|create_steel_frame_estimate|mark_steel_frame_proposal_generated|does not exist|could not find the function/i.test(message ?? "")
+    /steel_frame_|create_steel_frame_estimate|mark_steel_frame_proposal_generated|approve_steel_frame_technical|does not exist|could not find the function/i.test(message ?? "")
   ) {
     return steelFrameMigrationRequiredMessage;
   }
@@ -270,6 +276,174 @@ export async function createSteelFrameMaterial({
 
   if (error) throw new Error(getSteelFrameErrorMessage(error));
   return data as SteelFrameMaterialRecord;
+}
+
+export async function listSteelFrameTechnicalRules() {
+  const client = getClient();
+  const { data, error } = await client
+    .from("steel_frame_technical_rules")
+    .select("*")
+    .order("status", { ascending: true })
+    .order("updated_at", { ascending: false });
+
+  if (error) throw new Error(getSteelFrameErrorMessage(error));
+  return (data ?? []) as SteelFrameTechnicalRuleRecord[];
+}
+
+export async function listSteelFrameTechnicalCompositions() {
+  const client = getClient();
+  const { data, error } = await client
+    .from("steel_frame_technical_compositions")
+    .select("*, rules:steel_frame_technical_composition_rules(*, rule:steel_frame_technical_rules(*))")
+    .order("status", { ascending: true })
+    .order("name", { ascending: true });
+
+  if (error) throw new Error(getSteelFrameErrorMessage(error));
+  return (data ?? []) as SteelFrameTechnicalCompositionRecord[];
+}
+
+export async function createSteelFrameTechnicalRule(input: Parameters<typeof steelFrameTechnicalRuleDraftSchema.parse>[0]) {
+  const parsed = steelFrameTechnicalRuleDraftSchema.parse(input);
+  const client = getClient();
+  const { data, error } = await client
+    .from("steel_frame_technical_rules")
+    .insert({
+      code: parsed.code,
+      version: parsed.version,
+      name: parsed.name,
+      rule_type: parsed.ruleType,
+      origin: parsed.origin,
+      reference_name: parsed.referenceName,
+      reference_version: parsed.referenceVersion,
+      permitted_use: toNullableString(parsed.permittedUse),
+      application_scope: parsed.applicationScope,
+      conditions: parsed.conditions,
+      parameters: parsed.parameters,
+      limits: parsed.limits,
+      technical_responsible_name: toNullableString(parsed.technicalResponsibleName),
+      technical_responsible_registration: toNullableString(parsed.technicalResponsibleRegistration),
+      approval_notes: toNullableString(parsed.approvalNotes),
+      effective_from: parsed.effectiveFrom ?? null,
+      effective_to: parsed.effectiveTo ?? null,
+    })
+    .select("*")
+    .single();
+
+  if (error) throw new Error(getSteelFrameErrorMessage(error));
+  return data as SteelFrameTechnicalRuleRecord;
+}
+
+export async function createSteelFrameTechnicalComposition(input: Parameters<typeof steelFrameTechnicalCompositionDraftSchema.parse>[0]) {
+  const parsed = steelFrameTechnicalCompositionDraftSchema.parse(input);
+  const client = getClient();
+  const { data, error } = await client
+    .from("steel_frame_technical_compositions")
+    .insert({
+      code: parsed.code,
+      version: parsed.version,
+      name: parsed.name,
+      application_type: parsed.applicationType,
+      profile_specification: toNullableString(parsed.profileSpecification),
+      description: toNullableString(parsed.description),
+      permitted_use: toNullableString(parsed.permittedUse),
+      application_scope: parsed.applicationScope,
+      conditions: parsed.conditions,
+      limits: parsed.limits,
+      technical_responsible_name: toNullableString(parsed.technicalResponsibleName),
+      technical_responsible_registration: toNullableString(parsed.technicalResponsibleRegistration),
+      approval_notes: toNullableString(parsed.approvalNotes),
+      effective_from: parsed.effectiveFrom ?? null,
+      effective_to: parsed.effectiveTo ?? null,
+    })
+    .select("*")
+    .single();
+
+  if (error) throw new Error(getSteelFrameErrorMessage(error));
+
+  if (parsed.ruleIds.length) {
+    const { error: linkError } = await client
+      .from("steel_frame_technical_composition_rules")
+      .insert(parsed.ruleIds.map((ruleId, index) => ({
+        composition_id: data.id,
+        rule_id: ruleId,
+        sort_order: index,
+      })));
+    if (linkError) throw new Error(getSteelFrameErrorMessage(linkError));
+  }
+
+  return data as SteelFrameTechnicalCompositionRecord;
+}
+
+export async function approveSteelFrameTechnicalRule(ruleId: string, reviewNotes?: string | null) {
+  const client = getClient();
+  const { data, error } = await client.rpc("approve_steel_frame_technical_rule", {
+    target_rule_id: ruleId,
+    review_notes: toNullableString(reviewNotes),
+  });
+
+  if (error) throw new Error(getSteelFrameErrorMessage(error));
+  return data as SteelFrameTechnicalRuleRecord;
+}
+
+export async function approveSteelFrameTechnicalComposition(compositionId: string, reviewNotes?: string | null) {
+  const client = getClient();
+  const { data, error } = await client.rpc("approve_steel_frame_technical_composition", {
+    target_composition_id: compositionId,
+    review_notes: toNullableString(reviewNotes),
+  });
+
+  if (error) throw new Error(getSteelFrameErrorMessage(error));
+  return data as SteelFrameTechnicalCompositionRecord;
+}
+
+export async function getLatestSteelFrameTechnicalAssessment(estimateId: string) {
+  const client = getClient();
+  const { data, error } = await client
+    .from("steel_frame_technical_assessments")
+    .select("*, composition:steel_frame_technical_compositions(id, code, version, name, status)")
+    .eq("estimate_id", estimateId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new Error(getSteelFrameErrorMessage(error));
+  return data as SteelFrameTechnicalAssessmentRecord | null;
+}
+
+export async function createSteelFrameTechnicalAssessment({
+  estimateId,
+  compositionId,
+  classification,
+  inputSnapshot,
+  findings,
+  missingInformation,
+  ruleSnapshot,
+}: {
+  estimateId: string;
+  compositionId?: string | null;
+  classification: SteelFrameTechnicalClassification;
+  inputSnapshot: Record<string, unknown>;
+  findings: Array<{ code: string; severity: "info" | "warning" | "critical"; message: string }>;
+  missingInformation: string[];
+  ruleSnapshot: Array<Record<string, unknown>>;
+}) {
+  const client = getClient();
+  const { data, error } = await client
+    .from("steel_frame_technical_assessments")
+    .insert({
+      estimate_id: estimateId,
+      composition_id: compositionId ?? null,
+      classification,
+      input_snapshot: inputSnapshot,
+      findings,
+      missing_information: missingInformation,
+      rule_snapshot: ruleSnapshot,
+    })
+    .select("*, composition:steel_frame_technical_compositions(id, code, version, name, status)")
+    .single();
+
+  if (error) throw new Error(getSteelFrameErrorMessage(error));
+  return data as SteelFrameTechnicalAssessmentRecord;
 }
 
 export async function getSteelFrameCosting(estimateId: string): Promise<SteelFrameCostingSnapshot> {

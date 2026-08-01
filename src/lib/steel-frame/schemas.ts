@@ -5,6 +5,8 @@ import {
   steelFrameConfirmationStatuses,
   steelFrameEstimateStatuses,
   steelFrameRoundingModes,
+  steelFrameTechnicalApplicationTypes,
+  steelFrameTechnicalRuleOrigins,
 } from "./types";
 
 const nonNegativeNumber = z.number().finite().min(0);
@@ -213,6 +215,87 @@ export const steelFrameAIExtractionSchema = z.object({
   evidence: steelFrameAIEvidenceSchema,
 });
 
+const jsonObjectSchema = z.record(z.string(), z.unknown());
+const technicalCodeSchema = z
+  .string()
+  .trim()
+  .regex(/^[A-Za-z0-9][A-Za-z0-9_-]{1,63}$/, "Use letras, numeros, hifen ou sublinhado no codigo.");
+const optionalShortText = z.string().trim().max(160).nullable().optional();
+const optionalLongText = z.string().trim().max(5000).nullable().optional();
+const optionalDate = z
+  .string()
+  .trim()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Informe a data no formato AAAA-MM-DD.")
+  .nullable()
+  .optional();
+
+export const steelFrameTechnicalLimitsSchema = z
+  .object({
+    maxWallHeightMeters: optionalPositiveNumber.optional(),
+    maxFloors: optionalPositiveInteger.optional(),
+    allowedStudSpacingMeters: z.array(positiveNumber.max(10)).max(20).optional(),
+    maxOpeningWidthMeters: optionalPositiveNumber.optional(),
+    requiresWindValidation: z.boolean().nullable().optional(),
+    requiresRoofReview: z.boolean().nullable().optional(),
+    requiresTechnicalReview: z.boolean().nullable().optional(),
+  })
+  .passthrough();
+
+export const steelFrameTechnicalRuleDraftSchema = z.object({
+  code: technicalCodeSchema,
+  version: z.string().trim().min(1, "Informe a versao.").max(64),
+  name: z.string().trim().min(3, "Informe o nome da regra.").max(180),
+  ruleType: z.string().trim().min(2, "Informe o tipo da regra.").max(80),
+  origin: z.enum(steelFrameTechnicalRuleOrigins),
+  referenceName: z.string().trim().min(2, "Informe a fonte da regra.").max(180),
+  referenceVersion: z.string().trim().min(1, "Informe a versao da fonte.").max(80),
+  permittedUse: optionalLongText,
+  applicationScope: jsonObjectSchema.default({}),
+  conditions: jsonObjectSchema.default({}),
+  parameters: jsonObjectSchema.default({}),
+  limits: steelFrameTechnicalLimitsSchema.default({}),
+  technicalResponsibleName: optionalShortText,
+  technicalResponsibleRegistration: optionalShortText,
+  approvalNotes: optionalLongText,
+  effectiveFrom: optionalDate,
+  effectiveTo: optionalDate,
+}).superRefine((input, context) => {
+  if (input.effectiveFrom && input.effectiveTo && input.effectiveTo < input.effectiveFrom) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["effectiveTo"],
+      message: "A vigencia final nao pode ser anterior a vigencia inicial.",
+    });
+  }
+});
+
+export const steelFrameTechnicalCompositionDraftSchema = z.object({
+  code: technicalCodeSchema,
+  version: z.string().trim().min(1, "Informe a versao.").max(64),
+  name: z.string().trim().min(3, "Informe o nome da composicao.").max(180),
+  applicationType: z.enum(steelFrameTechnicalApplicationTypes),
+  profileSpecification: optionalLongText,
+  description: optionalLongText,
+  permittedUse: optionalLongText,
+  applicationScope: jsonObjectSchema.default({}),
+  conditions: jsonObjectSchema.default({}),
+  limits: steelFrameTechnicalLimitsSchema.default({}),
+  technicalResponsibleName: optionalShortText,
+  technicalResponsibleRegistration: optionalShortText,
+  approvalNotes: optionalLongText,
+  effectiveFrom: optionalDate,
+  effectiveTo: optionalDate,
+  ruleIds: z.array(z.string().uuid()).max(100).default([]),
+}).superRefine((input, context) => {
+  if (input.effectiveFrom && input.effectiveTo && input.effectiveTo < input.effectiveFrom) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["effectiveTo"],
+      message: "A vigencia final nao pode ser anterior a vigencia inicial.",
+    });
+  }
+});
+
 export type SteelFrameEstimateDraftInput = z.infer<typeof steelFrameEstimateDraftSchema>;
 export type SteelFrameEstimateDraftFormInput = z.input<typeof steelFrameEstimateDraftSchema>;
 export type SteelFrameWallSegmentInput = z.infer<typeof steelFrameWallSegmentSchema>;
@@ -224,3 +307,5 @@ export type SteelFrameCommercialComponentsInput = z.infer<
 export type SteelFrameCalculatedItemInput = z.infer<typeof steelFrameCalculatedItemSchema>;
 export type SteelFrameLaborItemInput = z.infer<typeof steelFrameLaborItemSchema>;
 export type SteelFrameOperationalCostInput = z.infer<typeof steelFrameOperationalCostSchema>;
+export type SteelFrameTechnicalRuleDraftInput = z.infer<typeof steelFrameTechnicalRuleDraftSchema>;
+export type SteelFrameTechnicalCompositionDraftInput = z.infer<typeof steelFrameTechnicalCompositionDraftSchema>;

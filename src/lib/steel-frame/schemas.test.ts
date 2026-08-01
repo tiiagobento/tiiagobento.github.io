@@ -5,6 +5,8 @@ import {
   steelFrameCalculationRuleSchema,
   steelFrameCommercialComponentsSchema,
   steelFrameEstimateDraftSchema,
+  steelFrameTechnicalCompositionDraftSchema,
+  steelFrameTechnicalRuleDraftSchema,
 } from "./schemas";
 
 describe("steel frame schemas", () => {
@@ -63,5 +65,28 @@ describe("steel frame schemas", () => {
 
     expect(result.evidence.pageNumber).toBe(1);
     expect(result.confidence).toBeCloseTo(0.72);
+  });
+
+  it("allows incomplete technical limits only in a draft, so the validator can keep the estimate preliminary", () => {
+    const rule = steelFrameTechnicalRuleDraftSchema.parse({
+      code: "NF-TEST-001",
+      version: "1.0",
+      name: "Regra em levantamento",
+      ruleType: "validation",
+      origin: "company",
+      referenceName: "Memorial interno",
+      referenceVersion: "rascunho",
+      limits: {},
+    });
+    const composition = steelFrameTechnicalCompositionDraftSchema.parse({
+      code: "NF-COMP-001",
+      version: "1.0",
+      name: "Composicao em levantamento",
+      applicationType: "structural",
+      limits: {},
+    });
+
+    expect(rule.limits).toEqual({});
+    expect(composition.ruleIds).toEqual([]);
   });
 });

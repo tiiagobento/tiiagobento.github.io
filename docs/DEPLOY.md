@@ -91,6 +91,7 @@ supabase/migrations/ensure_primary_admin.sql
 supabase/migrations/add_partner_commissions_and_lead_files.sql
 supabase/migrations/add_permission_audit_details.sql
 supabase/migrations/add_steel_frame_estimates.sql
+supabase/migrations/add_steel_frame_technical_rules.sql
 ```
 
 ### 3. Ordem das Migrations
@@ -106,6 +107,7 @@ Instalacao nova:
 7. `supabase/migrations/add_partner_commissions_and_lead_files.sql`
 8. `supabase/migrations/add_permission_audit_details.sql`
 9. `supabase/migrations/add_steel_frame_estimates.sql`
+10. `supabase/migrations/add_steel_frame_technical_rules.sql`
 
 Banco existente antigo:
 
@@ -118,6 +120,7 @@ Banco existente antigo:
 7. `supabase/migrations/add_partner_commissions_and_lead_files.sql`, para fechar o fluxo de retorno de visita, controle de comissao de 5%, avisos de parceiro e anexos privados em Storage.
 8. `supabase/migrations/add_permission_audit_details.sql`, para registrar no historico administrativo as permissoes individuais antes e depois de cada alteracao de acesso.
 9. `supabase/migrations/add_steel_frame_estimates.sql`, para a base de orcamentos Steel Frame, RLS de precificacao, auditoria, versoes e bucket privado de documentos. Leia `docs/STEEL_FRAME_ESTIMATES.md` antes de aplicar.
+10. `supabase/migrations/add_steel_frame_technical_rules.sql`, para regras e composicoes tecnicas versionadas, validacoes append-only e bloqueio de aprovacao sem vigencia, responsavel e registro. Leia `docs/STEEL_FRAME_TECHNICAL_RULES.md` antes de aplicar.
 
 ### 4. Supabase Auth URLs
 

@@ -368,3 +368,159 @@ export type SteelFrameOperationalCostInput = {
   amount: number;
   notes?: string | null;
 };
+
+// Technical rules are intentionally versioned business/engineering artefacts. The
+// application never treats a generic calculation rule as a structural approval.
+export const steelFrameTechnicalRuleStatuses = [
+  "draft",
+  "approved",
+  "superseded",
+  "archived",
+] as const;
+export type SteelFrameTechnicalRuleStatus =
+  (typeof steelFrameTechnicalRuleStatuses)[number];
+
+export const steelFrameTechnicalRuleOrigins = [
+  "standard",
+  "manufacturer",
+  "company",
+  "technical_responsible",
+] as const;
+export type SteelFrameTechnicalRuleOrigin =
+  (typeof steelFrameTechnicalRuleOrigins)[number];
+
+export const steelFrameTechnicalApplicationTypes = [
+  "structural",
+  "non_structural",
+  "floor",
+  "roof",
+  "other",
+] as const;
+export type SteelFrameTechnicalApplicationType =
+  (typeof steelFrameTechnicalApplicationTypes)[number];
+
+export const steelFrameTechnicalClassifications = [
+  "automatic",
+  "preliminary",
+  "technical_review_required",
+] as const;
+export type SteelFrameTechnicalClassification =
+  (typeof steelFrameTechnicalClassifications)[number];
+
+export type SteelFrameTechnicalLimits = {
+  maxWallHeightMeters?: number | null;
+  maxFloors?: number | null;
+  allowedStudSpacingMeters?: number[];
+  maxOpeningWidthMeters?: number | null;
+  requiresWindValidation?: boolean | null;
+  requiresRoofReview?: boolean | null;
+  requiresTechnicalReview?: boolean | null;
+  [key: string]: unknown;
+};
+
+export type SteelFrameTechnicalRuleRecord = {
+  id: string;
+  created_by: string;
+  code: string;
+  version: string;
+  name: string;
+  rule_type: string;
+  origin: SteelFrameTechnicalRuleOrigin;
+  reference_name: string;
+  reference_version: string;
+  permitted_use: string | null;
+  application_scope: Record<string, unknown>;
+  conditions: Record<string, unknown>;
+  parameters: Record<string, unknown>;
+  limits: SteelFrameTechnicalLimits;
+  technical_responsible_name: string | null;
+  technical_responsible_registration: string | null;
+  status: SteelFrameTechnicalRuleStatus;
+  approved_by: string | null;
+  approved_at: string | null;
+  approval_notes: string | null;
+  effective_from: string | null;
+  effective_to: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SteelFrameTechnicalCompositionRuleRecord = {
+  id: string;
+  composition_id: string;
+  rule_id: string;
+  sort_order: number;
+  created_at: string;
+  rule?: SteelFrameTechnicalRuleRecord | null;
+};
+
+export type SteelFrameTechnicalCompositionRecord = {
+  id: string;
+  created_by: string;
+  code: string;
+  version: string;
+  name: string;
+  application_type: SteelFrameTechnicalApplicationType;
+  profile_specification: string | null;
+  description: string | null;
+  permitted_use: string | null;
+  application_scope: Record<string, unknown>;
+  conditions: Record<string, unknown>;
+  limits: SteelFrameTechnicalLimits;
+  technical_responsible_name: string | null;
+  technical_responsible_registration: string | null;
+  status: SteelFrameTechnicalRuleStatus;
+  approved_by: string | null;
+  approved_at: string | null;
+  approval_notes: string | null;
+  effective_from: string | null;
+  effective_to: string | null;
+  created_at: string;
+  updated_at: string;
+  rules?: SteelFrameTechnicalCompositionRuleRecord[];
+};
+
+export type SteelFrameTechnicalValidationContext = {
+  wallUse: "structural" | "non_structural" | "unknown";
+  studSpacingMeters: number | null;
+  windValidation: "confirmed" | "pending" | "unknown";
+  roofComplexity: "simple" | "complex" | "unknown";
+};
+
+export type SteelFrameTechnicalFinding = {
+  code: string;
+  severity: "info" | "warning" | "critical";
+  message: string;
+};
+
+export type SteelFrameTechnicalAssessmentResult = {
+  classification: SteelFrameTechnicalClassification;
+  summary: string;
+  findings: SteelFrameTechnicalFinding[];
+  missingInformation: string[];
+  ruleSnapshot: Array<{
+    id: string;
+    code: string;
+    version: string;
+    name: string;
+    origin: SteelFrameTechnicalRuleOrigin;
+    referenceName: string;
+    referenceVersion: string;
+    status: SteelFrameTechnicalRuleStatus;
+  }>;
+};
+
+export type SteelFrameTechnicalAssessmentRecord = {
+  id: string;
+  estimate_id: string;
+  estimate_version_id: string | null;
+  composition_id: string | null;
+  classification: SteelFrameTechnicalClassification;
+  input_snapshot: Record<string, unknown>;
+  findings: SteelFrameTechnicalFinding[];
+  missing_information: string[];
+  rule_snapshot: SteelFrameTechnicalAssessmentResult["ruleSnapshot"];
+  assessed_by: string;
+  created_at: string;
+  composition?: Pick<SteelFrameTechnicalCompositionRecord, "id" | "code" | "version" | "name" | "status"> | null;
+};

@@ -1,6 +1,7 @@
 "use client";
 
-import { PackagePlus, RefreshCw, ShieldCheck, Tag } from "lucide-react";
+import { BookMarked, PackagePlus, RefreshCw, ShieldCheck, Tag } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useNavigationAccess } from "@/components/app-navigation";
@@ -86,6 +87,12 @@ export function MaterialCatalog() {
 
   return (
     <div className="space-y-5">
+      <Card className="border-primary/10 bg-secondary/20">
+        <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div><p className="font-medium">Modelos tecnicos e regras aprovadas</p><p className="mt-1 text-sm text-muted-foreground">Configure fontes, limites e responsaveis em um catalogo versionado antes de liberar qualquer classificacao automatica.</p></div>
+          <Button asChild variant="outline"><Link href="/estimates/catalog/technical"><BookMarked className="size-4" /> Abrir modelos tecnicos</Link></Button>
+        </CardContent>
+      </Card>
       {canManage ? (
         <Card className="border-primary/10">
           <CardHeader><CardTitle className="flex items-center gap-2 text-base text-primary"><PackagePlus className="size-4" /> Adicionar material</CardTitle></CardHeader>

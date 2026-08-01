@@ -13,6 +13,10 @@ const steelFrameEstimatesMigration = readFileSync(
   resolve(process.cwd(), "supabase/migrations/add_steel_frame_estimates.sql"),
   "utf8",
 );
+const steelFrameTechnicalRulesMigration = readFileSync(
+  resolve(process.cwd(), "supabase/migrations/add_steel_frame_technical_rules.sql"),
+  "utf8",
+);
 
 function getSteelFrameTriggerTargets(triggerSuffix: string) {
   const markerIndex = steelFrameEstimatesMigration.indexOf(`target_table || '${triggerSuffix}'`);
@@ -187,5 +191,26 @@ describe("Supabase Steel Frame estimates migration", () => {
     expect(steelFrameEstimatesMigration).toContain(
       "unique nulls not distinct (estimate_id, estimate_version_id, component_key)",
     );
+  });
+});
+
+describe("Supabase Steel Frame technical rules migration", () => {
+  it("adds versioned technical artefacts without creating or deleting commercial data", () => {
+    expect(steelFrameTechnicalRulesMigration).toContain("create table if not exists public.steel_frame_technical_rules");
+    expect(steelFrameTechnicalRulesMigration).toContain("create table if not exists public.steel_frame_technical_compositions");
+    expect(steelFrameTechnicalRulesMigration).toContain("create table if not exists public.steel_frame_technical_assessments");
+    expect(steelFrameTechnicalRulesMigration).toContain("unique (code, version)");
+    expect(steelFrameTechnicalRulesMigration).not.toMatch(/drop\s+table|truncate\s+table|delete\s+from\s+public\.(leads|profiles|tasks|interactions)/i);
+  });
+
+  it("keeps approvals explicit, protects approved versions, and enables RLS", () => {
+    expect(steelFrameTechnicalRulesMigration).toContain("Modelos e regras tecnicas devem ser criados como rascunho");
+    expect(steelFrameTechnicalRulesMigration).toContain("Crie uma nova versao");
+    expect(steelFrameTechnicalRulesMigration).toContain("approve_steel_frame_technical_rule");
+    expect(steelFrameTechnicalRulesMigration).toContain("approve_steel_frame_technical_composition");
+    expect(steelFrameTechnicalRulesMigration).toContain("steel_frame_technical_rules_select_authorized");
+    expect(steelFrameTechnicalRulesMigration).toContain("status = 'approved' and public.can_view_steel_frame_catalog()");
+    expect(steelFrameTechnicalRulesMigration).toContain("steel_frame_technical_assessments_insert_authorized");
+    expect(steelFrameTechnicalRulesMigration).toContain("public.can_edit_steel_frame_estimate(estimate_id)");
   });
 });

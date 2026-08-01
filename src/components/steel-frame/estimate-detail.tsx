@@ -13,6 +13,7 @@ import { EstimateCosting } from "@/components/steel-frame/estimate-costing";
 import { EstimateApprovalActions } from "@/components/steel-frame/estimate-approval-actions";
 import { EstimateDocuments } from "@/components/steel-frame/estimate-documents";
 import { EstimateProposalActions } from "@/components/steel-frame/estimate-proposal-actions";
+import { TechnicalValidationPanel } from "@/components/steel-frame/technical-validation-panel";
 import {
   addSteelFrameOpening,
   addSteelFrameWall,
@@ -313,6 +314,13 @@ export function EstimateDetail({ estimateId }: EstimateDetailProps) {
         wallCount={walls.length}
         openingCount={openings.length}
         onGeometryChanged={load}
+        readOnly={isReadOnly}
+      />
+      <TechnicalValidationPanel
+        estimate={estimate}
+        walls={walls}
+        openings={openings}
+        geometryWarnings={areas.warnings}
         readOnly={isReadOnly}
       />
       <EstimateCosting estimateId={estimate.id} walls={walls} openings={openings} readOnly={isReadOnly} />

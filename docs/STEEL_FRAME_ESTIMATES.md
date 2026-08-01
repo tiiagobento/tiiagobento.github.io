@@ -29,6 +29,7 @@ Antes de aplicar, mantenha a ordem abaixo no SQL Editor ou no Supabase CLI:
 7. `supabase/migrations/add_partner_commissions_and_lead_files.sql`
 8. `supabase/migrations/add_permission_audit_details.sql`
 9. `supabase/migrations/add_steel_frame_estimates.sql`
+10. `supabase/migrations/add_steel_frame_technical_rules.sql`
 
 A migration e aditiva e idempotente. Ela nao apaga leads, perfis, tarefas, interacoes ou arquivos existentes. Em especial, a relacao de um orcamento com um lead usa `ON DELETE SET NULL`, preservando o historico de precificacao caso um lead seja removido depois.
 
@@ -75,6 +76,19 @@ Regras aceitas:
 - `MANUAL`
 
 Se um parametro obrigatorio estiver ausente, o calculo falha de forma explicita. A interface futura deve pedir confirmacao ao usuario ou encaminhar a revisao tecnica, em vez de supor uma medida.
+
+## Regras tecnicas versionadas
+
+Depois de aplicar `add_steel_frame_technical_rules.sql`, a ficha do orcamento
+tambem passa a registrar uma classificacao tecnica auditavel. Ela usa regras e
+composicoes aprovadas, com fonte, versao, vigencia e responsavel tecnico, e
+classifica o resultado como `ORCAMENTO AUTOMATICO`, `ORCAMENTO PRELIMINAR` ou
+`REVISAO TECNICA OBRIGATORIA`.
+
+Nenhum espacamento, perfil, carga ou limite normativo e fixado no codigo. A
+classificacao automatica apenas confirma que dados ja revisados se enquadram em
+um modelo aprovado; nao substitui projeto estrutural nem ART. Leia
+`docs/STEEL_FRAME_TECHNICAL_RULES.md` antes de cadastrar ou aprovar um modelo.
 
 ## Preco comercial
 
