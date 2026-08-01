@@ -13,6 +13,7 @@ import {
 } from "./types";
 
 const finiteNonNegative = z.number().finite().min(0);
+const finiteNonNegativeInteger = z.number().int().min(0);
 const finitePositive = z.number().finite().positive();
 const finitePositiveInteger = z.number().int().min(1);
 const identifier = z.string().trim().min(1).max(160);
@@ -45,7 +46,7 @@ export const steelFrameEngineOpeningReinforcementTemplateSchema = z.object({
   name: identifier,
   approvalStatus: steelFrameEngineApprovalStatusSchema,
   maxOpeningWidthMeters: finitePositive.nullable().default(null),
-  extraStudsPerOpening: finiteNonNegative.default(0),
+  extraStudsPerOpening: finiteNonNegativeInteger.default(0),
   lintelMetersPerOpening: finiteNonNegative.default(0),
   sillMetersPerOpening: finiteNonNegative.default(0),
   openingTrackMetersPerOpening: finiteNonNegative.default(0),
@@ -197,9 +198,9 @@ const steelFrameEngineStudRuleSchema = steelFrameEngineRuleMetadataSchema.extend
   strategy: z.literal("STUD_BY_SPACING"),
   parameters: z.object({
     spacingMeters: finitePositive,
-    initialStudsPerWall: finiteNonNegative,
-    endStudsPerWall: finiteNonNegative,
-    manualExtraStuds: finiteNonNegative,
+    initialStudsPerWall: finiteNonNegativeInteger,
+    endStudsPerWall: finiteNonNegativeInteger,
+    manualExtraStuds: finiteNonNegativeInteger,
     commercialStock: steelFrameEngineStockParametersSchema,
   }),
 });
@@ -207,8 +208,8 @@ const steelFrameEngineStudRuleSchema = steelFrameEngineRuleMetadataSchema.extend
 const steelFrameEngineTrackRuleSchema = steelFrameEngineRuleMetadataSchema.extend({
   strategy: z.literal("TRACK_BY_WALL_LENGTH"),
   parameters: z.object({
-    lowerRunsPerWall: finiteNonNegative,
-    upperRunsPerWall: finiteNonNegative,
+    lowerRunsPerWall: finiteNonNegativeInteger,
+    upperRunsPerWall: finiteNonNegativeInteger,
     openingTrackMetersPerOpening: finiteNonNegative,
     blockingTrackMetersPerWall: finiteNonNegative,
     lintelTrackMetersPerOpening: finiteNonNegative,
@@ -218,18 +219,30 @@ const steelFrameEngineTrackRuleSchema = steelFrameEngineRuleMetadataSchema.exten
   }),
 });
 
-const steelFrameEngineBlockingRuleSchema = steelFrameEngineRuleMetadataSchema.extend({
-  strategy: z.literal("BLOCKING_BY_STUD_PATTERN"),
-  parameters: z.object({
+const steelFrameEngineBlockingParametersSchema = z
+  .object({
     pattern: z.enum(steelFrameEngineBlockingPatterns),
     spacingMeters: finitePositive,
     pieceLengthMeters: finitePositive,
     lines: z.number().int().min(0),
     verticalIntervalMeters: finitePositive.nullable().default(null),
-    fixedQuantityPerWall: finiteNonNegative,
-    manualQuantityPerWall: finiteNonNegative,
+    fixedQuantityPerWall: finiteNonNegativeInteger,
+    manualQuantityPerWall: finiteNonNegativeInteger,
     commercialStock: steelFrameEngineStockParametersSchema,
-  }),
+  })
+  .superRefine((parameters, context) => {
+    if (parameters.pattern === "vertical_interval" && parameters.verticalIntervalMeters === null) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["verticalIntervalMeters"],
+        message: "Informe o intervalo vertical para este padrao de bloqueadores.",
+      });
+    }
+  });
+
+const steelFrameEngineBlockingRuleSchema = steelFrameEngineRuleMetadataSchema.extend({
+  strategy: z.literal("BLOCKING_BY_STUD_PATTERN"),
+  parameters: steelFrameEngineBlockingParametersSchema,
 });
 
 const steelFrameEngineBoardRuleSchema = steelFrameEngineRuleMetadataSchema.extend({

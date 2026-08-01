@@ -230,6 +230,34 @@ describe("steel frame engine typed strategies", () => {
     expect(result.cuttingPlan?.commercialBarsToPurchase).toBe(2);
   });
 
+  it("blocks track reinforcement when a required opening template is absent", () => {
+    const result = calculate({
+      ...ruleMetadata({
+        strategy: "TRACK_BY_WALL_LENGTH",
+        technicalUnit: "m",
+        purchaseUnit: "bar",
+        acceptedInputUnits: ["m"],
+      }),
+      parameters: {
+        lowerRunsPerWall: 1,
+        upperRunsPerWall: 1,
+        openingTrackMetersPerOpening: 0,
+        blockingTrackMetersPerWall: 0,
+        lintelTrackMetersPerOpening: 0,
+        sillTrackMetersPerOpening: 0,
+        manualTrackMeters: 0,
+        commercialStock,
+      },
+    }, {
+      openings: [
+        { id: "door-without-track-template", wallId: "wall-a", label: "Porta sem template", openingType: "door", widthMeters: 0.9, heightMeters: 2.1, quantity: 1, requiresReinforcement: true, reinforcementTemplate: null },
+      ],
+    });
+
+    expect(result.classification).toBe("blocked");
+    expect(result.alerts.map((alert) => alert.code)).toContain("OPENING_TEMPLATE_MISSING");
+  });
+
   it("calculates blockers from the configured pattern instead of a fixed percentage", () => {
     const result = calculate({
       ...ruleMetadata({
@@ -373,7 +401,7 @@ describe("steel frame engine typed strategies", () => {
       parameters: { technicalQuantity: 21, unitsPerPurchaseUnit: 10 },
     });
     const cutting = calculate({
-      ...ruleMetadata({ strategy: "CUTTING_STOCK_OPTIMIZATION", technicalUnit: "m", purchaseUnit: "bar", acceptedInputUnits: ["m"] }),
+      ...ruleMetadata({ strategy: "CUTTING_STOCK_OPTIMIZATION", technicalUnit: "m", purchaseUnit: "bar", acceptedInputUnits: ["m"], wastePercent: 10 }),
       parameters: { pieces: [{ id: "cut-a", label: "Peca", quantity: 2, lengthMeters: 3, source: "Teste" }], ...commercialStock },
     });
 
@@ -381,7 +409,10 @@ describe("steel frame engine typed strategies", () => {
     expect(fixedProject.quantities.raw.value).toBe(6);
     expect(manual.classification).toBe("technical_review_required");
     expect(packaging.quantities.purchase.quantity).toBe(3);
-    expect(cutting.cuttingPlan?.commercialBarsToPurchase).toBe(1);
+    expect(cutting.quantities.raw.value).toBe(6);
+    expect(cutting.quantities.withWaste.value).toBe(6.6);
+    expect(cutting.quantities.waste.quantity.value).toBe(0.6);
+    expect(cutting.cuttingPlan?.commercialBarsToPurchase).toBe(2);
   });
 
   it("marks missing, invalid, unapproved, and manually overridden inputs safely", () => {

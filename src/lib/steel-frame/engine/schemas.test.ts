@@ -45,6 +45,53 @@ describe("steel frame engine schemas", () => {
     expect(parsed.success).toBe(false);
   });
 
+  it("rejects fractional physical counts and incomplete vertical blocking parameters", () => {
+    const fractionalStuds = steelFrameEngineRuleSchema.safeParse({
+      id: "stud-fractional",
+      code: "STUD_FRACTIONAL",
+      name: "Montantes",
+      version: "1",
+      approvalStatus: "approved",
+      source,
+      strategy: "STUD_BY_SPACING",
+      technicalUnit: "piece",
+      purchaseUnit: "bar",
+      acceptedInputUnits: ["m"],
+      parameters: {
+        spacingMeters: 0.4,
+        initialStudsPerWall: 1.5,
+        endStudsPerWall: 1,
+        manualExtraStuds: 0,
+        commercialStock: { commercialBars: [{ id: "bar", label: "Barra", lengthMeters: 6, availableQuantity: null }] },
+      },
+    });
+    const verticalBlocking = steelFrameEngineRuleSchema.safeParse({
+      id: "blocking",
+      code: "BLOCKING_VERTICAL",
+      name: "Bloqueadores",
+      version: "1",
+      approvalStatus: "approved",
+      source,
+      strategy: "BLOCKING_BY_STUD_PATTERN",
+      technicalUnit: "piece",
+      purchaseUnit: "bar",
+      acceptedInputUnits: ["m"],
+      parameters: {
+        pattern: "vertical_interval",
+        spacingMeters: 0.4,
+        pieceLengthMeters: 0.35,
+        lines: 0,
+        verticalIntervalMeters: null,
+        fixedQuantityPerWall: 0,
+        manualQuantityPerWall: 0,
+        commercialStock: { commercialBars: [{ id: "bar", label: "Barra", lengthMeters: 6, availableQuantity: null }] },
+      },
+    });
+
+    expect(fractionalStuds.success).toBe(false);
+    expect(verticalBlocking.success).toBe(false);
+  });
+
   it("parses a typed request with explicit defaults instead of formulas", () => {
     const parsed = steelFrameEngineCalculationRequestSchema.safeParse({
       rule: {

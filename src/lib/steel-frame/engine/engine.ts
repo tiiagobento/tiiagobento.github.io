@@ -720,6 +720,7 @@ function calculateTracks(
   if (missingWalls) return missingWalls;
 
   const entries: SteelFrameEngineTechnicalPiece[] = [];
+  const alerts: SteelFrameEngineAlert[] = [];
   let lowerMeters = 0;
   let upperMeters = 0;
   let openingMeters = 0;
@@ -764,6 +765,20 @@ function calculateTracks(
 
   openings.forEach((opening) => {
     const template = opening.reinforcementTemplate;
+    if (opening.requiresReinforcement && !template) {
+      alerts.push({
+        code: "OPENING_TEMPLATE_MISSING",
+        severity: "critical",
+        message: `A abertura ${opening.label} exige reforco, mas nao possui template configurado.`,
+      });
+    }
+    if (template && template.approvalStatus !== "approved") {
+      alerts.push({
+        code: "OPENING_TEMPLATE_NOT_APPROVED",
+        severity: "warning",
+        message: `O template de reforco ${template.name} da abertura ${opening.label} ainda nao esta aprovado.`,
+      });
+    }
     const templateOpening = template?.openingTrackMetersPerOpening ?? 0;
     const templateBlocking = template?.blockingTrackMetersPerOpening ?? 0;
     const openingLength = rule.parameters.openingTrackMetersPerOpening + templateOpening;
@@ -821,6 +836,31 @@ function calculateTracks(
   const rawLengthMeters = roundSteelFrameEngineNumber(
     basePieces.reduce((total, piece) => total + piece.quantity * piece.lengthMeters, 0),
   );
+  const missingTemplate = alerts.some((alert) => alert.code === "OPENING_TEMPLATE_MISSING");
+  if (missingTemplate) {
+    return buildResult({
+      rule,
+      context,
+      walls,
+      openings,
+      quantities: createBarQuantityResult({
+        rawLengthMeters,
+        lengthWithWasteMeters: rawLengthMeters * (1 + rule.wastePercent / 100),
+        wastePercent: rule.wastePercent,
+        purchaseQuantity: 0,
+        totalCommercialLengthMeters: 0,
+        totalLeftoverMeters: 0,
+      }),
+      technicalPieces: basePieces,
+      alerts,
+      classification: "blocked",
+      explanation: createExplanation({
+        title: "Guias por comprimento de parede",
+        strategy: rule.strategy,
+        summary: "O calculo das guias foi bloqueado porque uma abertura exige um template de reforco configurado.",
+      }),
+    });
+  }
   const reservePieces = createWasteReservePieces({
     totalWasteLengthMeters: rawLengthMeters * (rule.wastePercent / 100),
     commercialBars: rule.parameters.commercialStock.commercialBars,
@@ -834,7 +874,14 @@ function calculateTracks(
   const withWasteLengthMeters = roundSteelFrameEngineNumber(
     technicalPieces.reduce((total, piece) => total + piece.quantity * piece.lengthMeters, 0),
   );
-  const classification = rule.parameters.manualTrackMeters > 0 ? "technical_review_required" : "automatic_eligible";
+  const templateNeedsReview = alerts.some(
+    (alert) => alert.code === "OPENING_TEMPLATE_NOT_APPROVED",
+  );
+  const classification = missingTemplate
+    ? "blocked"
+    : templateNeedsReview || rule.parameters.manualTrackMeters > 0
+      ? "technical_review_required"
+      : "automatic_eligible";
 
   return buildResult({
     rule,
@@ -851,6 +898,7 @@ function calculateTracks(
     }),
     technicalPieces,
     cuttingPlan,
+    alerts,
     classification,
     explanation: createExplanation({
       title: "Guias por comprimento de parede",
@@ -1308,14 +1356,27 @@ function calculateCuttingStock(
   walls: SteelFrameEngineWall[],
   openings: ParsedContext["openings"],
 ): SteelFrameEngineCalculationResult {
+  const rawLengthMeters = roundSteelFrameEngineNumber(
+    rule.parameters.pieces.reduce(
+      (total, piece) => total + piece.quantity * piece.lengthMeters,
+      0,
+    ),
+  );
+  const technicalPieces = createTechnicalPieces([
+    ...rule.parameters.pieces,
+    ...createWasteReservePieces({
+      totalWasteLengthMeters: rawLengthMeters * (rule.wastePercent / 100),
+      commercialBars: rule.parameters.commercialBars,
+      idPrefix: "cutting-stock:waste",
+    }),
+  ]);
   const cuttingPlan = calculateSteelFrameCuttingPlan({
-    pieces: rule.parameters.pieces,
+    pieces: technicalPieces,
     commercialBars: rule.parameters.commercialBars,
     kerfMeters: rule.parameters.kerfMeters,
     reusableLeftovers: rule.parameters.reusableLeftovers,
     minimumReusableLeftoverMeters: rule.parameters.minimumReusableLeftoverMeters,
   });
-  const rawLengthMeters = cuttingPlan.totalRequiredPieceLengthMeters;
   return buildResult({
     rule,
     context,
@@ -1323,13 +1384,13 @@ function calculateCuttingStock(
     openings,
     quantities: createBarQuantityResult({
       rawLengthMeters,
-      lengthWithWasteMeters: rawLengthMeters,
+      lengthWithWasteMeters: cuttingPlan.totalRequiredPieceLengthMeters,
       wastePercent: rule.wastePercent,
       purchaseQuantity: cuttingPlan.commercialBarsToPurchase,
       totalCommercialLengthMeters: cuttingPlan.totalCommercialLengthMeters,
       totalLeftoverMeters: cuttingPlan.totalLeftoverMeters,
     }),
-    technicalPieces: rule.parameters.pieces,
+    technicalPieces,
     cuttingPlan,
     explanation: createExplanation({
       title: "Otimizacao de corte",
@@ -1421,7 +1482,9 @@ export function calculateSteelFrameEngineRule(input: unknown): SteelFrameEngineC
   const parsed = steelFrameEngineCalculationRequestSchema.safeParse(input);
   if (!parsed.success) {
     const firstIssue = parsed.error.issues[0];
-    return createBlockedResult(firstIssue?.message ?? "A regra de calculo e invalida.");
+    const path = firstIssue?.path.join(".");
+    const detail = firstIssue?.message ?? "A regra de calculo e invalida.";
+    return createBlockedResult(path ? `${path}: ${detail}` : detail);
   }
 
   try {
