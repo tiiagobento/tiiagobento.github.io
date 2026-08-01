@@ -221,6 +221,17 @@ Guia completo: `docs/DEPLOY.md`.
 
 O alicerce seguro do modulo de orcamentos esta em `supabase/migrations/add_steel_frame_estimates.sql` e `src/lib/steel-frame`. Ele inclui RLS, versoes, arquivos privados, catalogo parametrico, motor de quantidades, precificacao explicavel e proposta PDF interna vinculada a uma versao aprovada, sem fixar regras tecnicas ou custos no codigo. A migration `add_steel_frame_technical_rules.sql` acrescenta composicoes e regras versionadas, com vigencia, responsavel tecnico e classificacao auditavel. Veja `docs/STEEL_FRAME_ESTIMATES.md` e `docs/STEEL_FRAME_TECHNICAL_RULES.md` antes de aplicar as migrations.
 
+Para iniciar a proxima fase do catalogo tecnico, use primeiro o preflight
+somente de leitura em `supabase/verification/steel_frame_phase2_preflight.sql`.
+O bootstrap seguro de um projeto novo de homologacao esta documentado em
+`docs/STEEL_FRAME_HOMOLOGATION_BOOTSTRAP.md`. Nunca execute essa sequencia em
+producao ou em uma base parcialmente configurada.
+As fontes internas da proxima fase e seus limites de aprovacao estao em
+`docs/STEEL_FRAME_PHASE_2_SOURCE_REGISTER.md`.
+O contrato local da persistencia versionada, catalogo e snapshots da Fase 2
+esta em `docs/STEEL_FRAME_PHASE_2_CATALOG_FOUNDATION.md`; a migration nao deve
+ser aplicada em producao ou em uma base parcial.
+
 ## Scripts
 
 ```bash
@@ -232,6 +243,7 @@ npm run test:e2e
 npm run build
 npm run android:sync
 npm run android:debug
+npm run supabase:diagnose
 ```
 
 No PowerShell do Windows, se `npm` for bloqueado por execution policy, use `npm.cmd run ...`.

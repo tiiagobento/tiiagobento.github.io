@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "npm run build && playwright test",
+    "supabase:diagnose": "node scripts/supabase-readonly-diagnose.mjs",
     "android:sync": "cap sync android",
     "android:debug": "cd android && gradlew.bat assembleDebug",
     "android:release": "cd android && gradlew.bat assembleRelease",

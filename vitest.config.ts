@@ -19,10 +19,11 @@ export default defineConfig({
     include: ["src/**/*.test.{ts,tsx}"],
     exclude: ["node_modules", ".next", "e2e"],
     css: true,
-    // Reuse the worker on Windows. Spawning a fork for every test file made the
-    // complete suite exceed the CI timeout; route authorization mocks share an
-    // explicit resettable test state instead of depending on module isolation.
-    pool: "forks",
+    // Keep one reusable worker on Windows. The forks pool intermittently timed
+    // out while starting the jsdom worker after the suites had already passed.
+    // Threads keep the same serial execution without leaving child processes
+    // behind at shutdown.
+    pool: "threads",
     fileParallelism: false,
     maxWorkers: 1,
     isolate: false,
