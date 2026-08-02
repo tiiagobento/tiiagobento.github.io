@@ -49,10 +49,16 @@ Nao serao publicados automaticamente como regra global:
 Qualquer uso do caso deve gerar a comparacao "historico informado x calculo
 parametrizado" e manter as pendencias tecnicas visiveis para revisao humana.
 
-## Limite desta etapa
+## Biblioteca tecnica no CRM
 
-Leitura visual multipass, calibracao por escala, extracao geometrica e cadastros
-reais de fontes continuam bloqueados ate que o preflight passe em um projeto
-Supabase de homologacao confirmado. A migration aditiva da Fase 2 ja esta no
-repositorio para revisao, mas sua aplicacao remota continua bloqueada por esse
-mesmo gate.
+O CRM possui a rota `/estimates/catalog/sources` para registrar fontes como
+rascunho e anexar PDF, JPG, PNG ou WEBP. Os arquivos seguem para o bucket
+privado `steel-frame-catalog`; a abertura usa URL assinada de curta duracao.
+
+O cadastro da fonte nao publica nenhuma regra, coeficiente, preco, composicao
+ou template. A publicacao continua sujeita a revisao e permissao tecnica no
+banco. A interface mostra um erro acionavel se a migration da Fase 2 ainda nao
+existir no Supabase configurado.
+
+Leitura visual multipass, calibracao por escala e extracao geometrica seguem
+em fases posteriores. Nenhum desses recursos e ativado por este registro.

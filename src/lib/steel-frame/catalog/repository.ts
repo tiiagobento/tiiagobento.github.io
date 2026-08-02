@@ -2,6 +2,10 @@ import type {
   SteelFrameCatalogMaterialPrice,
   SteelFrameCatalogRuleDraft,
   SteelFrameCatalogSnapshot,
+  SteelFrameCatalogTechnicalSource,
+  SteelFrameCatalogTechnicalSourceDocument,
+  SteelFrameCatalogTechnicalSourceDocumentDraft,
+  SteelFrameCatalogTechnicalSourceDraft,
 } from "./types";
 
 export type SteelFrameCatalogSnapshotToPersist = {
@@ -16,6 +20,13 @@ export type SteelFrameCatalogSnapshotToPersist = {
 // The deterministic engine consumes this interface instead of a Supabase client.
 // A concrete storage adapter can change without changing calculation behavior.
 export interface SteelFrameCatalogRepository {
+  listTechnicalSources(): Promise<SteelFrameCatalogTechnicalSource[]>;
+  createTechnicalSource(input: SteelFrameCatalogTechnicalSourceDraft): Promise<SteelFrameCatalogTechnicalSource>;
+  listTechnicalSourceDocuments(sourceId: string): Promise<SteelFrameCatalogTechnicalSourceDocument[]>;
+  createTechnicalSourceDocument(
+    input: SteelFrameCatalogTechnicalSourceDocumentDraft,
+  ): Promise<SteelFrameCatalogTechnicalSourceDocument>;
+  deleteTechnicalSourceDocument(documentId: string): Promise<void>;
   getRule(ruleId: string): Promise<SteelFrameCatalogRuleDraft | null>;
   listMaterialPrices(input: {
     materialId: string;

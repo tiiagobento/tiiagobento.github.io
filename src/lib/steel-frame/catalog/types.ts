@@ -44,6 +44,74 @@ export type SteelFrameCatalogSourceReference = {
   pageReference: string | null;
 };
 
+export const steelFrameCatalogTechnicalSourceStatuses = [
+  "draft",
+  "pending_validation",
+  "approved",
+  "deprecated",
+  "archived",
+] as const;
+
+export type SteelFrameCatalogTechnicalSourceStatus =
+  (typeof steelFrameCatalogTechnicalSourceStatuses)[number];
+
+export type SteelFrameCatalogTechnicalSourceDraft = {
+  title: string;
+  sourceType: SteelFrameTechnicalSourceType;
+  code: string | null;
+  issuer: string | null;
+  manufacturer: string | null;
+  productName: string | null;
+  edition: string | null;
+  revision: string | null;
+  publishedOn: string | null;
+  effectiveFrom: string | null;
+  effectiveTo: string | null;
+  sourceUrl: string | null;
+  contentSha256: string | null;
+  permittedUse: string | null;
+  notes: string | null;
+};
+
+export type SteelFrameCatalogTechnicalSourceDocument = {
+  id: string;
+  sourceId: string;
+  originalFileName: string;
+  storagePath: string;
+  mimeType: "application/pdf" | "image/jpeg" | "image/png" | "image/webp";
+  fileSizeBytes: number;
+  pageCount: number | null;
+  contentSha256: string | null;
+  visibility: "catalog" | "restricted";
+  notes: string | null;
+  status: SteelFrameCatalogTechnicalSourceStatus;
+  createdAt: string;
+};
+
+export type SteelFrameCatalogTechnicalSource = SteelFrameCatalogTechnicalSourceDraft & {
+  id: string;
+  createdBy: string;
+  status: SteelFrameCatalogTechnicalSourceStatus;
+  approvedBy: string | null;
+  approvedAt: string | null;
+  approvalNotes: string | null;
+  deprecatedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  documents: SteelFrameCatalogTechnicalSourceDocument[];
+};
+
+export type SteelFrameCatalogTechnicalSourceDocumentDraft = {
+  sourceId: string;
+  originalFileName: string;
+  storagePath: string;
+  mimeType: SteelFrameCatalogTechnicalSourceDocument["mimeType"];
+  fileSizeBytes: number;
+  contentSha256?: string | null;
+  visibility?: SteelFrameCatalogTechnicalSourceDocument["visibility"];
+  notes?: string | null;
+};
+
 export type SteelFrameCatalogRuleDraft = {
   id: string;
   code: string;
