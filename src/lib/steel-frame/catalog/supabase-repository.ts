@@ -6,6 +6,7 @@ import {
   steelFrameCatalogMaterialPriceSchema,
   steelFrameTechnicalSourceDraftSchema,
 } from "./schemas";
+import { steelFrameSupplierQuoteDraftSchema, type SteelFrameSupplierQuoteRecord } from "./supplier-quotes";
 import type { SteelFrameCatalogRepository, SteelFrameCatalogSnapshotToPersist } from "./repository";
 import {
   steelFrameCatalogTechnicalSourceStatuses,
@@ -153,6 +154,64 @@ function mapPriceRow(row: CatalogRow): SteelFrameCatalogMaterialPrice {
   });
 }
 
+function mapSupplierQuoteRow(row: CatalogRow): SteelFrameSupplierQuoteRecord {
+  const source = row.source as CatalogRow | null;
+  const sourceDocument = row.source_document as CatalogRow | null;
+  const items = Array.isArray(row.items) ? row.items as CatalogRow[] : [];
+
+  const draft = steelFrameSupplierQuoteDraftSchema.parse({
+    sourceId: row.source_id,
+    sourceDocumentId: row.source_document_id,
+    supplierId: textOrNull(row.supplier_id),
+    supplierName: row.supplier_name_snapshot,
+    supplierTaxId: textOrNull(row.supplier_tax_id_snapshot),
+    supplierContactName: textOrNull(row.supplier_contact_name_snapshot),
+    supplierContactPhone: textOrNull(row.supplier_contact_phone_snapshot),
+    supplierContactEmail: textOrNull(row.supplier_contact_email_snapshot),
+    quoteNumber: textOrNull(row.quote_number),
+    issuedOn: textOrNull(row.issued_on),
+    validUntil: textOrNull(row.valid_until),
+    expectedBillingOn: textOrNull(row.expected_billing_on),
+    paymentTerms: textOrNull(row.payment_terms),
+    subtotal: row.subtotal === null || row.subtotal === undefined ? null : Number(row.subtotal),
+    discount: row.discount === null || row.discount === undefined ? null : Number(row.discount),
+    freight: row.freight === null || row.freight === undefined ? null : Number(row.freight),
+    taxes: row.taxes === null || row.taxes === undefined ? null : Number(row.taxes),
+    total: Number(row.total),
+    currency: row.currency,
+    notes: textOrNull(row.notes),
+    items: items.map((item) => ({
+      sourceLineNumber: Number(item.source_line_number),
+      externalCode: textOrNull(item.external_code),
+      description: item.description,
+      ncm: textOrNull(item.ncm),
+      quantity: Number(item.quantity),
+      unit: item.unit,
+      unitPrice: Number(item.unit_price),
+      lineTotal: Number(item.line_total),
+      materialId: textOrNull(item.material_id),
+      materialVariantId: textOrNull(item.material_variant_id),
+      matchingStatus: item.matching_status,
+    })),
+  });
+
+  const status = row.status;
+  if (status !== "captured" && status !== "archived") {
+    throw new Error("O catalogo retornou um status de cotacao desconhecido.");
+  }
+
+  return {
+    ...draft,
+    id: requiredText(row.id, "id"),
+    status,
+    createdBy: requiredText(row.created_by, "created_by"),
+    createdAt: requiredText(row.created_at, "created_at"),
+    updatedAt: requiredText(row.updated_at, "updated_at"),
+    sourceTitle: source ? textOrNull(source.title) : null,
+    sourceDocumentName: sourceDocument ? textOrNull(sourceDocument.original_file_name) : null,
+  };
+}
+
 export function createSupabaseSteelFrameCatalogRepository(
   client: SupabaseClient = createSupabaseBrowserClient(),
 ): SteelFrameCatalogRepository {
@@ -236,6 +295,67 @@ export function createSupabaseSteelFrameCatalogRepository(
         .eq("id", documentId);
 
       if (error) throw error;
+    },
+
+    async listSupplierQuotes() {
+      const { data, error } = await client
+        .from("steel_frame_supplier_quotes")
+        .select(`
+          *,
+          source:steel_frame_technical_sources(title),
+          source_document:steel_frame_technical_source_documents(original_file_name),
+          items:steel_frame_supplier_quote_items(*)
+        `)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return ((data ?? []) as CatalogRow[]).map(mapSupplierQuoteRow);
+    },
+
+    async createSupplierQuote(input) {
+      const parsed = steelFrameSupplierQuoteDraftSchema.parse(input);
+      const { data, error } = await client.rpc("create_steel_frame_supplier_quote", {
+        quote_payload: {
+          source_id: parsed.sourceId,
+          source_document_id: parsed.sourceDocumentId,
+          supplier_id: parsed.supplierId,
+          supplier_name_snapshot: parsed.supplierName,
+          supplier_tax_id_snapshot: parsed.supplierTaxId,
+          supplier_contact_name_snapshot: parsed.supplierContactName,
+          supplier_contact_phone_snapshot: parsed.supplierContactPhone,
+          supplier_contact_email_snapshot: parsed.supplierContactEmail,
+          quote_number: parsed.quoteNumber,
+          issued_on: parsed.issuedOn,
+          valid_until: parsed.validUntil,
+          expected_billing_on: parsed.expectedBillingOn,
+          payment_terms: parsed.paymentTerms,
+          subtotal: parsed.subtotal,
+          discount: parsed.discount,
+          freight: parsed.freight,
+          taxes: parsed.taxes,
+          total: parsed.total,
+          currency: parsed.currency,
+          notes: parsed.notes,
+        },
+        item_payload: parsed.items.map((item) => ({
+          source_line_number: item.sourceLineNumber,
+          external_code: item.externalCode,
+          description: item.description,
+          ncm: item.ncm,
+          quantity: item.quantity,
+          unit: item.unit,
+          unit_price: item.unitPrice,
+          line_total: item.lineTotal,
+          material_id: item.materialId,
+          material_variant_id: item.materialVariantId,
+          matching_status: item.matchingStatus,
+        })),
+      });
+
+      if (error) throw error;
+      const id = typeof data === "string" ? data : (data as { id?: unknown } | null)?.id;
+      if (typeof id !== "string") throw new Error("A cotacao foi criada sem identificador.");
+      return { id };
     },
 
     async getRule(ruleId) {

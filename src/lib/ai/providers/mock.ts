@@ -41,6 +41,35 @@ export function createMockProvider(): AIProvider {
         });
       }
 
+      if (input.task === "extract-supplier-quote") {
+        return JSON.stringify({
+          supplier: {
+            name: "Fornecedor de desenvolvimento",
+            tax_id: null,
+            contact_name: null,
+            contact_phone: null,
+            contact_email: null,
+          },
+          quote: {
+            number: "MOCK-001",
+            issued_on: null,
+            valid_until: null,
+            expected_billing_on: null,
+            payment_terms: "A confirmar",
+            subtotal: 0,
+            discount: 0,
+            freight: 0,
+            taxes: 0,
+            total: 0,
+            currency: "BRL",
+          },
+          items: [],
+          summary: "Cotacao simulada para desenvolvimento. Nenhum preco pode ser usado no catalogo sem revisao.",
+          warnings: ["Provider mock ativo: os valores nao vieram de uma cotacao real."],
+          confidence: 0,
+        });
+      }
+
       return JSON.stringify({
         leads: [
           {

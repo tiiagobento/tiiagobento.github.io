@@ -7,6 +7,10 @@ import type {
   SteelFrameCatalogTechnicalSourceDocumentDraft,
   SteelFrameCatalogTechnicalSourceDraft,
 } from "./types";
+import type {
+  SteelFrameSupplierQuoteDraft,
+  SteelFrameSupplierQuoteRecord,
+} from "./supplier-quotes";
 
 export type SteelFrameCatalogSnapshotToPersist = {
   estimateId: string;
@@ -27,6 +31,8 @@ export interface SteelFrameCatalogRepository {
     input: SteelFrameCatalogTechnicalSourceDocumentDraft,
   ): Promise<SteelFrameCatalogTechnicalSourceDocument>;
   deleteTechnicalSourceDocument(documentId: string): Promise<void>;
+  listSupplierQuotes(): Promise<SteelFrameSupplierQuoteRecord[]>;
+  createSupplierQuote(input: SteelFrameSupplierQuoteDraft): Promise<{ id: string }>;
   getRule(ruleId: string): Promise<SteelFrameCatalogRuleDraft | null>;
   listMaterialPrices(input: {
     materialId: string;

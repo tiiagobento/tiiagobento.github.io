@@ -45,6 +45,20 @@ Nenhuma regra, coeficiente, composicao, reforco ou preco aprovado e inserido
 pela migration. Os documentos tecnicos sao tratados como metadados e arquivos
 privados; normas protegidas nao devem ser copiadas para o banco.
 
+## Historico de cotacoes de fornecedor
+
+`supabase/migrations/20260802000000_steel_frame_supplier_quote_history.sql`
+depende da fundacao acima e acrescenta um historico comercial imutavel para
+cotacoes revisadas. Cada registro aponta para uma fonte do tipo
+`supplier_quote` e para seu documento privado no bucket `steel-frame-catalog`.
+
+- a leitura por IA devolve somente um rascunho editavel;
+- dados pessoais do comprador nao entram no rascunho comercial;
+- cada linha fica vinculada ao PDF ou imagem de origem;
+- nenhum item cria ou altera `steel_frame_material_prices` automaticamente;
+- correcao ou nova cotacao exige um novo registro, preservando o historico;
+- o acesso e restrito a quem possui `estimates.catalog.manage`.
+
 ## Camada de dominio local
 
 `src/lib/steel-frame/catalog/` contem interfaces de repository, schemas Zod,
