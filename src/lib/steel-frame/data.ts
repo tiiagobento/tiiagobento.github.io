@@ -305,6 +305,9 @@ export async function listSteelFrameTechnicalCompositions() {
 export async function createSteelFrameTechnicalRule(input: Parameters<typeof steelFrameTechnicalRuleDraftSchema.parse>[0]) {
   const parsed = steelFrameTechnicalRuleDraftSchema.parse(input);
   const client = getClient();
+  const sourceReference = parsed.sourceId
+    ? { source_id: parsed.sourceId, source_document_id: parsed.sourceDocumentId }
+    : {};
   const { data, error } = await client
     .from("steel_frame_technical_rules")
     .insert({
@@ -325,6 +328,7 @@ export async function createSteelFrameTechnicalRule(input: Parameters<typeof ste
       approval_notes: toNullableString(parsed.approvalNotes),
       effective_from: parsed.effectiveFrom ?? null,
       effective_to: parsed.effectiveTo ?? null,
+      ...sourceReference,
     })
     .select("*")
     .single();
@@ -336,6 +340,9 @@ export async function createSteelFrameTechnicalRule(input: Parameters<typeof ste
 export async function createSteelFrameTechnicalComposition(input: Parameters<typeof steelFrameTechnicalCompositionDraftSchema.parse>[0]) {
   const parsed = steelFrameTechnicalCompositionDraftSchema.parse(input);
   const client = getClient();
+  const sourceReference = parsed.sourceId
+    ? { source_id: parsed.sourceId, source_document_id: parsed.sourceDocumentId }
+    : {};
   const { data, error } = await client
     .from("steel_frame_technical_compositions")
     .insert({
@@ -354,6 +361,7 @@ export async function createSteelFrameTechnicalComposition(input: Parameters<typ
       approval_notes: toNullableString(parsed.approvalNotes),
       effective_from: parsed.effectiveFrom ?? null,
       effective_to: parsed.effectiveTo ?? null,
+      ...sourceReference,
     })
     .select("*")
     .single();

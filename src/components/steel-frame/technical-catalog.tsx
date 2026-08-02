@@ -1,7 +1,7 @@
 "use client";
 
 import { BookMarked, CheckCircle2, ClipboardList, Plus, RefreshCw, ShieldCheck } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useNavigationAccess } from "@/components/app-navigation";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,11 @@ import type {
   SteelFrameTechnicalRuleRecord,
   SteelFrameTechnicalRuleStatus,
 } from "@/lib/steel-frame/types";
+import {
+  createSupabaseSteelFrameCatalogRepository,
+  type SteelFrameCatalogTechnicalSource,
+} from "@/lib/steel-frame/catalog";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type RuleForm = {
   code: string;
@@ -44,6 +49,8 @@ type RuleForm = {
   conditions: string;
   parameters: string;
   limits: string;
+  sourceId: string;
+  sourceDocumentId: string;
 };
 
 type CompositionForm = {
@@ -61,6 +68,8 @@ type CompositionForm = {
   conditions: string;
   limits: string;
   ruleIds: string[];
+  sourceId: string;
+  sourceDocumentId: string;
 };
 
 const initialRuleForm: RuleForm = {
@@ -79,6 +88,8 @@ const initialRuleForm: RuleForm = {
   conditions: "{}",
   parameters: "{}",
   limits: "{}",
+  sourceId: "",
+  sourceDocumentId: "",
 };
 
 const initialCompositionForm: CompositionForm = {
@@ -96,6 +107,8 @@ const initialCompositionForm: CompositionForm = {
   conditions: "{}",
   limits: "{}",
   ruleIds: [],
+  sourceId: "",
+  sourceDocumentId: "",
 };
 
 const statusVariants: Record<SteelFrameTechnicalRuleStatus, "secondary" | "success" | "warning" | "outline"> = {
@@ -126,8 +139,12 @@ function parseJsonObject(value: string, label: string) {
 
 export function TechnicalCatalog() {
   const { role, permissions, loading: accessLoading } = useNavigationAccess();
+  const catalogClient = useMemo(() => createSupabaseBrowserClient(), []);
+  const catalogRepository = useMemo(() => createSupabaseSteelFrameCatalogRepository(catalogClient), [catalogClient]);
   const [rules, setRules] = useState<SteelFrameTechnicalRuleRecord[]>([]);
   const [compositions, setCompositions] = useState<SteelFrameTechnicalCompositionRecord[]>([]);
+  const [sources, setSources] = useState<SteelFrameCatalogTechnicalSource[]>([]);
+  const [sourceLibraryError, setSourceLibraryError] = useState<string | null>(null);
   const [ruleForm, setRuleForm] = useState<RuleForm>(initialRuleForm);
   const [compositionForm, setCompositionForm] = useState<CompositionForm>(initialCompositionForm);
   const [loading, setLoading] = useState(true);
@@ -149,12 +166,19 @@ export function TechnicalCatalog() {
       ]);
       setRules(nextRules);
       setCompositions(nextCompositions);
+      try {
+        setSources(await catalogRepository.listTechnicalSources());
+        setSourceLibraryError(null);
+      } catch (sourceError) {
+        setSources([]);
+        setSourceLibraryError(getSteelFrameErrorMessage(sourceError));
+      }
     } catch (loadError) {
       setError(getSteelFrameErrorMessage(loadError));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [catalogRepository]);
 
   useEffect(() => {
     void load();
@@ -187,6 +211,8 @@ export function TechnicalCatalog() {
         technicalResponsibleRegistration: ruleForm.technicalResponsibleRegistration || null,
         effectiveFrom: ruleForm.effectiveFrom || null,
         effectiveTo: ruleForm.effectiveTo || null,
+        sourceId: ruleForm.sourceId || null,
+        sourceDocumentId: ruleForm.sourceDocumentId || null,
       });
       setRuleForm(initialRuleForm);
       toast.success("Regra tecnica criada como rascunho.");
@@ -224,6 +250,8 @@ export function TechnicalCatalog() {
         technicalResponsibleRegistration: compositionForm.technicalResponsibleRegistration || null,
         effectiveFrom: compositionForm.effectiveFrom || null,
         effectiveTo: compositionForm.effectiveTo || null,
+        sourceId: compositionForm.sourceId || null,
+        sourceDocumentId: compositionForm.sourceDocumentId || null,
       });
       setCompositionForm(initialCompositionForm);
       toast.success("Composicao tecnica criada como rascunho.");
@@ -286,6 +314,7 @@ export function TechnicalCatalog() {
                 <Field label="Origem"><Select value={ruleForm.origin} onValueChange={(value) => setRuleForm((current) => ({ ...current, origin: value as SteelFrameTechnicalRuleOrigin }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="standard">Norma</SelectItem><SelectItem value="manufacturer">Fabricante</SelectItem><SelectItem value="company">Empresa</SelectItem><SelectItem value="technical_responsible">Responsavel tecnico</SelectItem></SelectContent></Select></Field>
                 <Field label="Fonte"><Input value={ruleForm.referenceName} onChange={(event) => setRuleForm((current) => ({ ...current, referenceName: event.target.value }))} placeholder="Documento, norma ou fabricante" /></Field>
                 <Field label="Versao da fonte"><Input value={ruleForm.referenceVersion} onChange={(event) => setRuleForm((current) => ({ ...current, referenceVersion: event.target.value }))} placeholder="Edicao, revisao ou data" /></Field>
+                <TechnicalSourceReferenceFields sources={sources} sourceId={ruleForm.sourceId} sourceDocumentId={ruleForm.sourceDocumentId} sourceLibraryError={sourceLibraryError} onSourceChange={(sourceId) => setRuleForm((current) => ({ ...current, sourceId, sourceDocumentId: "" }))} onDocumentChange={(sourceDocumentId) => setRuleForm((current) => ({ ...current, sourceDocumentId }))} />
                 <Field label="Responsavel tecnico"><Input value={ruleForm.technicalResponsibleName} onChange={(event) => setRuleForm((current) => ({ ...current, technicalResponsibleName: event.target.value }))} placeholder="Obrigatorio para aprovar" /></Field>
                 <Field label="Registro profissional"><Input value={ruleForm.technicalResponsibleRegistration} onChange={(event) => setRuleForm((current) => ({ ...current, technicalResponsibleRegistration: event.target.value }))} placeholder="CREA/CAU" /></Field>
                 <Field label="Vigencia inicial"><Input type="date" value={ruleForm.effectiveFrom} onChange={(event) => setRuleForm((current) => ({ ...current, effectiveFrom: event.target.value }))} /></Field>
@@ -313,6 +342,7 @@ export function TechnicalCatalog() {
                 <Field label="Registro profissional"><Input value={compositionForm.technicalResponsibleRegistration} onChange={(event) => setCompositionForm((current) => ({ ...current, technicalResponsibleRegistration: event.target.value }))} placeholder="CREA/CAU" /></Field>
                 <Field label="Vigencia inicial"><Input type="date" value={compositionForm.effectiveFrom} onChange={(event) => setCompositionForm((current) => ({ ...current, effectiveFrom: event.target.value }))} /></Field>
                 <Field label="Vigencia final"><Input type="date" value={compositionForm.effectiveTo} onChange={(event) => setCompositionForm((current) => ({ ...current, effectiveTo: event.target.value }))} /></Field>
+                <TechnicalSourceReferenceFields sources={sources} sourceId={compositionForm.sourceId} sourceDocumentId={compositionForm.sourceDocumentId} sourceLibraryError={sourceLibraryError} onSourceChange={(sourceId) => setCompositionForm((current) => ({ ...current, sourceId, sourceDocumentId: "" }))} onDocumentChange={(sourceDocumentId) => setCompositionForm((current) => ({ ...current, sourceDocumentId }))} />
                 <div className="md:col-span-2"><Field label="Descricao"><Textarea className="min-h-16" value={compositionForm.description} onChange={(event) => setCompositionForm((current) => ({ ...current, description: event.target.value }))} placeholder="Camadas, aplicacao e observacoes de projeto." /></Field></div>
                 <div className="md:col-span-2"><Field label="Uso permitido"><Textarea className="min-h-16" value={compositionForm.permittedUse} onChange={(event) => setCompositionForm((current) => ({ ...current, permittedUse: event.target.value }))} placeholder="Limites de uso e exclusoes conhecidas." /></Field></div>
                 <JsonField label="Condicoes JSON" value={compositionForm.conditions} onChange={(value) => setCompositionForm((current) => ({ ...current, conditions: value }))} placeholder='{"requires_structural_design": true}' />
@@ -349,6 +379,35 @@ function TechnicalCompositionCard({ composition, canApprove, approving, onApprov
 
 function Field({ label, className, children }: { label: string; className?: string; children: React.ReactNode }) {
   return <div className={`space-y-1.5 ${className ?? ""}`}><Label>{label}</Label>{children}</div>;
+}
+
+function TechnicalSourceReferenceFields({
+  sources,
+  sourceId,
+  sourceDocumentId,
+  sourceLibraryError,
+  onSourceChange,
+  onDocumentChange,
+}: {
+  sources: SteelFrameCatalogTechnicalSource[];
+  sourceId: string;
+  sourceDocumentId: string;
+  sourceLibraryError: string | null;
+  onSourceChange: (sourceId: string) => void;
+  onDocumentChange: (documentId: string) => void;
+}) {
+  if (sourceLibraryError) {
+    return <div className="md:col-span-2 rounded-lg border border-amber-500/25 bg-amber-500/[0.045] p-3 text-xs text-muted-foreground">A Biblioteca Tecnica ainda nao esta disponivel neste banco. Rascunhos continuam disponiveis; para aprovar no catalogo versionado, aplique a migration da Fase 2.</div>;
+  }
+
+  const selectedSource = sources.find((source) => source.id === sourceId) ?? null;
+  return (
+    <div className="md:col-span-2 grid gap-3 rounded-lg border border-border/70 p-3 sm:grid-cols-2">
+      <Field label="Fonte registrada"><Select value={sourceId || "none"} onValueChange={(value) => onSourceChange(value === "none" ? "" : value)}><SelectTrigger><SelectValue placeholder="Selecione a fonte" /></SelectTrigger><SelectContent><SelectItem value="none">Sem vinculo por enquanto</SelectItem>{sources.map((source) => <SelectItem key={source.id} value={source.id}>{source.title}</SelectItem>)}</SelectContent></Select></Field>
+      <Field label="Documento privado"><Select value={sourceDocumentId || "none"} disabled={!selectedSource || !selectedSource.documents.length} onValueChange={(value) => onDocumentChange(value === "none" ? "" : value)}><SelectTrigger><SelectValue placeholder={selectedSource ? "Selecione o documento" : "Selecione uma fonte"} /></SelectTrigger><SelectContent><SelectItem value="none">Sem documento por enquanto</SelectItem>{selectedSource?.documents.map((document) => <SelectItem key={document.id} value={document.id}>{document.originalFileName}</SelectItem>)}</SelectContent></Select></Field>
+      <p className="sm:col-span-2 text-xs text-muted-foreground">Fonte e documento sao obrigatorios somente antes da aprovacao. Crie ou anexe referencias na Biblioteca Tecnica.</p>
+    </div>
+  );
 }
 
 function JsonField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder: string }) {

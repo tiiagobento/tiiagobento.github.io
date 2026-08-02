@@ -441,6 +441,8 @@ export type SteelFrameTechnicalRuleRecord = {
   approval_notes: string | null;
   effective_from: string | null;
   effective_to: string | null;
+  source_id?: string | null;
+  source_document_id?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -475,6 +477,8 @@ export type SteelFrameTechnicalCompositionRecord = {
   approval_notes: string | null;
   effective_from: string | null;
   effective_to: string | null;
+  source_id?: string | null;
+  source_document_id?: string | null;
   created_at: string;
   updated_at: string;
   rules?: SteelFrameTechnicalCompositionRuleRecord[];

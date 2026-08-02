@@ -259,12 +259,21 @@ export const steelFrameTechnicalRuleDraftSchema = z.object({
   approvalNotes: optionalLongText,
   effectiveFrom: optionalDate,
   effectiveTo: optionalDate,
+  sourceId: z.string().uuid().nullable().default(null),
+  sourceDocumentId: z.string().uuid().nullable().default(null),
 }).superRefine((input, context) => {
   if (input.effectiveFrom && input.effectiveTo && input.effectiveTo < input.effectiveFrom) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["effectiveTo"],
       message: "A vigencia final nao pode ser anterior a vigencia inicial.",
+    });
+  }
+  if (input.sourceDocumentId && !input.sourceId) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["sourceDocumentId"],
+      message: "Selecione a fonte tecnica antes de vincular um documento.",
     });
   }
 });
@@ -286,12 +295,21 @@ export const steelFrameTechnicalCompositionDraftSchema = z.object({
   effectiveFrom: optionalDate,
   effectiveTo: optionalDate,
   ruleIds: z.array(z.string().uuid()).max(100).default([]),
+  sourceId: z.string().uuid().nullable().default(null),
+  sourceDocumentId: z.string().uuid().nullable().default(null),
 }).superRefine((input, context) => {
   if (input.effectiveFrom && input.effectiveTo && input.effectiveTo < input.effectiveFrom) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["effectiveTo"],
       message: "A vigencia final nao pode ser anterior a vigencia inicial.",
+    });
+  }
+  if (input.sourceDocumentId && !input.sourceId) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["sourceDocumentId"],
+      message: "Selecione a fonte tecnica antes de vincular um documento.",
     });
   }
 });

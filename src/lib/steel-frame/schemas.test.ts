@@ -87,6 +87,23 @@ describe("steel frame schemas", () => {
     });
 
     expect(rule.limits).toEqual({});
+    expect(rule.sourceId).toBeNull();
     expect(composition.ruleIds).toEqual([]);
+    expect(composition.sourceId).toBeNull();
+  });
+
+  it("does not allow a technical document to be linked without its source", () => {
+    const result = steelFrameTechnicalRuleDraftSchema.safeParse({
+      code: "NF-TEST-002",
+      version: "1.0",
+      name: "Regra com referencia incompleta",
+      ruleType: "validation",
+      origin: "company",
+      referenceName: "Memorial interno",
+      referenceVersion: "rascunho",
+      sourceDocumentId: "f046f2ea-5eeb-4389-9e62-3c99b2089d5e",
+    });
+
+    expect(result.success).toBe(false);
   });
 });
