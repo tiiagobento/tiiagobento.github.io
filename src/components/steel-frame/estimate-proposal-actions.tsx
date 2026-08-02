@@ -19,7 +19,9 @@ import { formatSteelFrameCurrency } from "@/lib/steel-frame/costing";
 import {
   buildSteelFrameProposalCode,
   buildSteelFrameProposalFilename,
+  buildSteelFrameProposalMaterialList,
   buildSteelFrameProposalPricing,
+  type SteelFrameProposalMaterialItem,
   type SteelFrameProposalPricing,
 } from "@/lib/steel-frame/proposal";
 import type { SteelFrameEstimateRecord } from "@/lib/steel-frame/types";
@@ -66,6 +68,7 @@ export type EstimateProposalPdfData = {
   scope: string;
   terms: string;
   notes: string | null;
+  materials: SteelFrameProposalMaterialItem[];
 };
 
 export function EstimateProposalActions({
@@ -78,6 +81,7 @@ export function EstimateProposalActions({
   const { role, permissions, loading: permissionsLoading } = useNavigationAccess();
   const [pricing, setPricing] = useState<SteelFrameProposalPricing | null>(null);
   const [pricingError, setPricingError] = useState<string | null>(null);
+  const [materials, setMaterials] = useState<SteelFrameProposalMaterialItem[]>([]);
   const [loadingPricing, setLoadingPricing] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [validityDays, setValidityDays] = useState("7");
@@ -93,15 +97,23 @@ export function EstimateProposalActions({
     if (!canLoadPricing) {
       setPricing(null);
       setPricingError(null);
+      setMaterials([]);
       return () => { active = false; };
     }
 
     setLoadingPricing(true);
     setPricingError(null);
+    setMaterials([]);
     void getSteelFrameCosting(estimate.id)
-      .then((snapshot) => buildSteelFrameProposalPricing(snapshot))
-      .then((nextPricing) => {
-        if (active) setPricing(nextPricing);
+      .then((snapshot) => ({
+        pricing: buildSteelFrameProposalPricing(snapshot),
+        materials: buildSteelFrameProposalMaterialList(snapshot.calculatedItems),
+      }))
+      .then((nextData) => {
+        if (active) {
+          setPricing(nextData.pricing);
+          setMaterials(nextData.materials);
+        }
       })
       .catch((error: unknown) => {
         if (active) setPricingError(getSteelFrameErrorMessage(error));
@@ -150,6 +162,7 @@ export function EstimateProposalActions({
       scope: scope.trim(),
       terms: terms.trim(),
       notes: estimate.notes,
+      materials,
     };
 
     try {
@@ -214,7 +227,7 @@ export function EstimateProposalActions({
               <div className="space-y-1.5"><Label htmlFor="proposal-validity">Validade (dias)</Label><Input id="proposal-validity" type="number" min={1} max={365} value={validityDays} onChange={(event) => setValidityDays(event.target.value)} disabled={generating} /></div>
             </div>
             <div className="space-y-1.5"><Label htmlFor="proposal-terms">Condicoes comerciais</Label><Textarea id="proposal-terms" value={terms} onChange={(event) => setTerms(event.target.value)} maxLength={5000} placeholder="Pagamento, condicoes ou informacoes a confirmar com o cliente." disabled={generating} /></div>
-            <div className="flex flex-col gap-3 rounded-lg border border-border/70 bg-background/70 p-3 sm:flex-row sm:items-center sm:justify-between"><p className="text-sm text-muted-foreground">O PDF sera salvo no bucket privado e vinculado a versao tecnica {estimate.current_version_number}. Nenhuma mensagem sera enviada automaticamente.</p><Button type="button" onClick={() => void generateProposal()} disabled={generating}>{generating ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}{generating ? "Gerando..." : "Gerar proposta PDF"}</Button></div>
+            <div className="flex flex-col gap-3 rounded-lg border border-border/70 bg-background/70 p-3 sm:flex-row sm:items-center sm:justify-between"><p className="text-sm text-muted-foreground">O PDF inclui {materials.length ? `${materials.length} materiais tecnicos sem custos unitarios, ` : "a base comercial, "}aceite e condicoes. Ele sera salvo no bucket privado e vinculado a versao tecnica {estimate.current_version_number}. Nenhuma mensagem sera enviada automaticamente.</p><Button type="button" onClick={() => void generateProposal()} disabled={generating}>{generating ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}{generating ? "Gerando..." : "Gerar proposta PDF"}</Button></div>
           </>
         ) : null}
       </CardContent>
@@ -323,15 +336,140 @@ export function createEstimateProposalPdf(pdf: ProposalPdfDocument, data: Estima
   y += 29;
   section("Escopo comercial");
   paragraph(data.scope, true);
-  section("Condicoes comerciais");
-  paragraph(data.terms || "A confirmar em negociacao comercial.", true);
   if (data.notes?.trim()) {
     section("Premissas registradas");
     paragraph(data.notes, true);
   }
+  if (data.materials.length) {
+    nextPage();
+    section("Relacao tecnica de materiais");
+    paragraph("Quantidades estimadas para a versao tecnica desta proposta. Valores unitarios e custos internos nao integram este documento.", true);
+    drawProposalMaterialsTable(pdf, data.materials, () => y, (value) => { y = value; }, nextPage);
+  }
+  section("Condicoes comerciais");
+  paragraph(data.terms || "A confirmar em negociacao comercial.", true);
+  // Keep the call to action and the acceptance lines together whenever possible.
+  if (y + 66 > CONTENT_BOTTOM) {
+    nextPage();
+  }
   section("Proximos passos");
   paragraph("Esta proposta foi gerada a partir da versao tecnica aprovada. A confirmacao de escopo, condicoes e aceite deve ser registrada no CRM antes de qualquer alteracao de status.", true);
+  drawProposalAcceptance(pdf, () => y, (value) => { y = value; }, nextPage);
   addProposalFooters(pdf, data.proposalCode);
+}
+
+function drawProposalMaterialsTable(
+  pdf: ProposalPdfDocument,
+  materials: SteelFrameProposalMaterialItem[],
+  getY: () => number,
+  setY: (value: number) => void,
+  nextPage: () => void,
+) {
+  const numberWidth = 12;
+  const quantityWidth = 25;
+  const unitWidth = 22;
+  const descriptionWidth = CONTENT_WIDTH - numberWidth - quantityWidth - unitWidth;
+  const drawHeader = () => {
+    let y = getY();
+    if (y + 8 > CONTENT_BOTTOM) {
+      nextPage();
+      y = getY();
+    }
+    pdf.setFillColor(...PRIMARY);
+    pdf.rect(MARGIN, y, CONTENT_WIDTH, 8, "F");
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(255, 255, 255);
+    pdf.text("#", MARGIN + 4, y + 5.2);
+    pdf.text("QTD.", MARGIN + numberWidth + 4, y + 5.2);
+    pdf.text("UN.", MARGIN + numberWidth + quantityWidth + 4, y + 5.2);
+    pdf.text("DESCRICAO", MARGIN + numberWidth + quantityWidth + unitWidth + 4, y + 5.2);
+    setY(y + 8);
+  };
+
+  let category: string | null = null;
+  drawHeader();
+
+  materials.forEach((item, index) => {
+    let y = getY();
+    if (item.category !== category) {
+      if (y + 7 > CONTENT_BOTTOM) {
+        nextPage();
+        drawHeader();
+        y = getY();
+      }
+      pdf.setFillColor(230, 238, 246);
+      pdf.rect(MARGIN, y, CONTENT_WIDTH, 7, "F");
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(7.4);
+      pdf.setTextColor(...PRIMARY);
+      pdf.text(item.category.toUpperCase(), MARGIN + 4, y + 4.8);
+      y += 7;
+      setY(y);
+      category = item.category;
+    }
+
+    const description = pdf.splitTextToSize(item.label, descriptionWidth - 8);
+    const rowHeight = Math.max(7, description.length * 4.1 + 3);
+    if (y + rowHeight > CONTENT_BOTTOM) {
+      nextPage();
+      drawHeader();
+      y = getY();
+    }
+    if (index % 2 === 1) {
+      pdf.setFillColor(248, 250, 252);
+      pdf.rect(MARGIN, y, CONTENT_WIDTH, rowHeight, "F");
+    }
+    pdf.setDrawColor(226, 232, 240);
+    pdf.setLineWidth(0.15);
+    pdf.rect(MARGIN, y, CONTENT_WIDTH, rowHeight);
+    pdf.rect(MARGIN + numberWidth, y, quantityWidth, rowHeight);
+    pdf.rect(MARGIN + numberWidth + quantityWidth, y, unitWidth, rowHeight);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(8.1);
+    pdf.setTextColor(...INK);
+    pdf.text(String(index + 1), MARGIN + 4, y + 4.6);
+    pdf.text(formatProposalQuantity(item.quantity), MARGIN + numberWidth + 4, y + 4.6);
+    pdf.text(item.unit, MARGIN + numberWidth + quantityWidth + 4, y + 4.6);
+    pdf.text(description, MARGIN + numberWidth + quantityWidth + unitWidth + 4, y + 4.6);
+    setY(y + rowHeight);
+  });
+
+  setY(getY() + 4);
+}
+
+function drawProposalAcceptance(
+  pdf: ProposalPdfDocument,
+  getY: () => number,
+  setY: (value: number) => void,
+  nextPage: () => void,
+) {
+  let y = getY();
+  const height = 29;
+  if (y + height > CONTENT_BOTTOM) {
+    nextPage();
+    y = getY();
+  }
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(11.5);
+  pdf.setTextColor(...PRIMARY);
+  pdf.text("Aceite da proposta", MARGIN, y + 5);
+  pdf.setDrawColor(148, 163, 184);
+  pdf.setLineWidth(0.25);
+  pdf.rect(MARGIN, y + 11, CONTENT_WIDTH, 0.1, "F");
+  pdf.rect(MARGIN, y + 21, CONTENT_WIDTH, 0.1, "F");
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(7.7);
+  pdf.setTextColor(...MUTED);
+  pdf.text("Cliente ou responsavel", MARGIN, y + 9.2);
+  pdf.text("Data", PAGE_WIDTH - MARGIN - 20, y + 9.2);
+  pdf.text("Assinatura", MARGIN, y + 19.2);
+  pdf.text("Telefone", PAGE_WIDTH - MARGIN - 20, y + 19.2);
+  setY(y + height);
+}
+
+function formatProposalQuantity(value: number) {
+  return new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 }).format(value);
 }
 
 function drawProposalHeader(pdf: ProposalPdfDocument, data: EstimateProposalPdfData, compact: boolean) {

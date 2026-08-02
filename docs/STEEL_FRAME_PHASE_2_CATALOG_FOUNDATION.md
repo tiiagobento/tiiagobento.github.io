@@ -59,6 +59,21 @@ cotacoes revisadas. Cada registro aponta para uma fonte do tipo
 - correcao ou nova cotacao exige um novo registro, preservando o historico;
 - o acesso e restrito a quem possui `estimates.catalog.manage`.
 
+## Proposta comercial para cliente
+
+O PDF gerado a partir de uma versao tecnica aprovada agora apresenta, alem do
+valor comercial e do escopo informado pelo usuario:
+
+- premissas registradas na estimativa;
+- relacao tecnica agrupada dos materiais calculados;
+- quantidades e unidades sem custos unitarios ou totais internos;
+- condicoes comerciais, proximos passos e area de aceite.
+
+A relacao e somente uma fotografia da versao usada para gerar a proposta. Ela
+nao aprova materiais, nao cria precos e nao substitui a revisao tecnica. Os
+PDFs comerciais recebidos como referencia nao sao carregados automaticamente
+no CRM nem transformados em dados de cliente.
+
 ## Camada de dominio local
 
 `src/lib/steel-frame/catalog/` contem interfaces de repository, schemas Zod,

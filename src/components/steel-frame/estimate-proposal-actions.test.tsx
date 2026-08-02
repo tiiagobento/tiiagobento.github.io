@@ -2,7 +2,7 @@
 
 import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { EstimateProposalActions } from "./estimate-proposal-actions";
+import { createEstimateProposalPdf, EstimateProposalActions } from "./estimate-proposal-actions";
 
 const dataMocks = vi.hoisted(() => ({
   getSteelFrameCosting: vi.fn(),
@@ -67,4 +67,53 @@ describe("EstimateProposalActions", () => {
     await waitFor(() => expect(screen.getByText("Configure todos os componentes comerciais antes de gerar a proposta.")).toBeInTheDocument());
     expect(screen.queryByRole("button", { name: "Gerar proposta PDF" })).not.toBeInTheDocument();
   });
+
+  it("renders quantities without internal costs and includes a formal acceptance area in the PDF", () => {
+    const pdf = new ProposalPdfSpy();
+
+    createEstimateProposalPdf(pdf as never, {
+      proposalCode: "NFSF-V2-20260802090000",
+      generatedAt: "02/08/2026, 09:00",
+      estimateTitle: "Residencia em Biguacu",
+      clientName: "Carlos",
+      city: "Biguacu",
+      neighborhood: "Deltaville",
+      projectType: "Casa residencial",
+      versionNumber: 2,
+      salePrice: 50000,
+      validityDays: 7,
+      scope: "Execucao da estrutura e dos fechamentos definidos no escopo aprovado.",
+      terms: "Pagamento e cronograma a confirmar no aceite.",
+      notes: "Altura e medidas ainda serao conferidas na visita tecnica.",
+      materials: [{ label: "Montante Steel Frame 90 x 0,95 x 6.000 mm", category: "Estrutura", unit: "barra", quantity: 18 }],
+    });
+
+    expect(pdf.content).toContain("Relacao tecnica de materiais");
+    expect(pdf.content).toContain("Montante Steel Frame 90 x 0,95 x 6.000 mm");
+    expect(pdf.content).toContain("Aceite da proposta");
+    expect(pdf.content).not.toContain("123.45");
+  });
 });
+
+class ProposalPdfSpy {
+  content: string[] = [];
+  pageCount = 1;
+
+  addPage() { this.pageCount += 1; }
+  getNumberOfPages() { return this.pageCount; }
+  output() { return new Blob(); }
+  rect() {}
+  roundedRect() {}
+  save() {}
+  setDrawColor() {}
+  setFillColor() {}
+  setFont() {}
+  setFontSize() {}
+  setLineWidth() {}
+  setPage() {}
+  setTextColor() {}
+  splitTextToSize(text: string) { return [text]; }
+  text(value: string | string[]) {
+    this.content.push(...(Array.isArray(value) ? value : [value]));
+  }
+}

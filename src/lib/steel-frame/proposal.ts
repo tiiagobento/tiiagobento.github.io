@@ -3,7 +3,10 @@ import {
   getCommercialComponentValues,
   sumSteelFrameDirectCosts,
 } from "./costing";
-import type { SteelFrameCostingSnapshot } from "./types";
+import type {
+  SteelFrameCalculatedItemRecord,
+  SteelFrameCostingSnapshot,
+} from "./types";
 
 export type SteelFrameProposalPricing = {
   directCost: number;
@@ -16,6 +19,13 @@ export type SteelFrameProposalPricing = {
   maximumAllowedDiscountAmount: number;
   minimumPriceAfterDiscount: number;
   warnings: string[];
+};
+
+export type SteelFrameProposalMaterialItem = {
+  label: string;
+  category: string;
+  unit: string;
+  quantity: number;
 };
 
 const requiredCommercialComponentKeys = [
@@ -53,6 +63,20 @@ export function buildSteelFrameProposalPricing(snapshot: SteelFrameCostingSnapsh
     ...costs,
     ...pricing,
   };
+}
+
+// Client proposals intentionally include quantities only. Unit costs and totals remain internal.
+export function buildSteelFrameProposalMaterialList(
+  calculatedItems: SteelFrameCalculatedItemRecord[],
+): SteelFrameProposalMaterialItem[] {
+  return calculatedItems
+    .map((item) => ({
+      label: String(item.label ?? "").trim(),
+      category: String(item.category ?? "").trim() || "Materiais previstos",
+      unit: String(item.unit ?? "").trim() || "un.",
+      quantity: Number(item.calculated_quantity ?? 0),
+    }))
+    .filter((item) => item.label.length > 0 && Number.isFinite(item.quantity) && item.quantity > 0);
 }
 
 export function buildSteelFrameProposalCode(versionNumber: number, date = new Date()) {

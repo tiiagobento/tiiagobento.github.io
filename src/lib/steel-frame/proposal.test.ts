@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildSteelFrameProposalCode,
   buildSteelFrameProposalFilename,
+  buildSteelFrameProposalMaterialList,
   buildSteelFrameProposalPricing,
 } from "./proposal";
 
@@ -42,5 +43,41 @@ describe("steel frame proposal pricing", () => {
 
     expect(code).toBe("NFSF-V3-20260731090729");
     expect(buildSteelFrameProposalFilename("Casa Sao Jose", code)).toBe("proposta-casa-sao-jose-nfsf-v3-20260731090729.pdf");
+  });
+
+  it("exposes technical quantities in a client proposal without exposing internal pricing", () => {
+    const materials = buildSteelFrameProposalMaterialList([
+      {
+        label: "Montante Steel Frame 90 x 0,95 x 6.000 mm",
+        category: "Estrutura",
+        unit: "barra",
+        calculated_quantity: 18,
+        unit_cost: 123.45,
+        total_cost: 2222.1,
+      },
+      {
+        label: "",
+        category: "Estrutura",
+        unit: "un.",
+        calculated_quantity: 2,
+      },
+      {
+        label: "Parafuso ponta broca",
+        category: "Fixadores",
+        unit: "un.",
+        calculated_quantity: 0,
+      },
+    ] as never);
+
+    expect(materials).toEqual([
+      {
+        label: "Montante Steel Frame 90 x 0,95 x 6.000 mm",
+        category: "Estrutura",
+        unit: "barra",
+        quantity: 18,
+      },
+    ]);
+    expect(JSON.stringify(materials)).not.toContain("123.45");
+    expect(JSON.stringify(materials)).not.toContain("2222.1");
   });
 });
