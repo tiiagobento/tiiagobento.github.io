@@ -9,5 +9,16 @@ export default defineConfig([
       "react-hooks/set-state-in-effect": "off",
     },
   },
-  globalIgnores([".next/**", "node_modules/**", "out/**", "build/**", "android/**/build/**", "next-env.d.ts"]),
+  globalIgnores([
+    ".next/**",
+    "node_modules/**",
+    "out/**",
+    "build/**",
+    "android/**/build/**",
+    "dist-mobile/**",
+    "test-results/**",
+    "tmp/**",
+    "docs/_render*/**",
+    "next-env.d.ts",
+  ]),
 ]);
