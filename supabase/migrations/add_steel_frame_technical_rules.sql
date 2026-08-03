@@ -12,7 +12,7 @@ create table if not exists public.steel_frame_technical_rules (
   version text not null,
   name text not null,
   rule_type text not null,
-  origin text not null check (origin in ('standard', 'manufacturer', 'company', 'technical_responsible')),
+  "origin" text not null check ("origin" in ('standard', 'manufacturer', 'company', 'technical_responsible')),
   reference_name text not null,
   reference_version text not null,
   permitted_use text,
