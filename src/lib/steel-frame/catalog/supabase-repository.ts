@@ -4,6 +4,9 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
   asSteelFrameCatalogRuleDraft,
   steelFrameCatalogMaterialPriceSchema,
+  steelFrameSupplierArchiveSchema,
+  steelFrameSupplierDraftSchema,
+  steelFrameSupplierUpdateSchema,
   steelFrameTechnicalSourceDraftSchema,
 } from "./schemas";
 import { steelFrameSupplierQuoteDraftSchema, type SteelFrameSupplierQuoteRecord } from "./supplier-quotes";
@@ -15,6 +18,7 @@ import {
   type SteelFrameCatalogTechnicalSource,
   type SteelFrameCatalogTechnicalSourceDocument,
   type SteelFrameCatalogTechnicalSourceStatus,
+  type SteelFrameSupplierRecord,
 } from "./types";
 
 type CatalogRow = Record<string, unknown>;
@@ -152,6 +156,29 @@ function mapPriceRow(row: CatalogRow): SteelFrameCatalogMaterialPrice {
     isManualOverride: false,
     createdAt: row.created_at,
   });
+}
+
+function mapSupplierRow(row: CatalogRow): SteelFrameSupplierRecord {
+  const parsed = steelFrameSupplierDraftSchema.parse({
+    name: row.name,
+    taxId: textOrNull(row.tax_id),
+    contactName: textOrNull(row.contact_name),
+    phone: textOrNull(row.phone),
+    email: textOrNull(row.email),
+    notes: textOrNull(row.notes),
+  });
+  if (typeof row.active !== "boolean") throw new Error("O catalogo retornou um fornecedor sem status valido.");
+  return {
+    ...parsed,
+    id: requiredText(row.id, "id"),
+    createdBy: requiredText(row.created_by, "created_by"),
+    active: row.active,
+    archivedAt: textOrNull(row.archived_at),
+    archivedBy: textOrNull(row.archived_by),
+    archiveReason: textOrNull(row.archive_reason),
+    createdAt: requiredText(row.created_at, "created_at"),
+    updatedAt: requiredText(row.updated_at, "updated_at"),
+  };
 }
 
 function mapSupplierQuoteRow(row: CatalogRow): SteelFrameSupplierQuoteRecord {
@@ -295,6 +322,59 @@ export function createSupabaseSteelFrameCatalogRepository(
         .eq("id", documentId);
 
       if (error) throw error;
+    },
+
+    async listSuppliers() {
+      const { data, error } = await client
+        .from("steel_frame_suppliers")
+        .select("*")
+        .order("active", { ascending: false })
+        .order("name", { ascending: true });
+
+      if (error) throw error;
+      return ((data ?? []) as CatalogRow[]).map(mapSupplierRow);
+    },
+
+    async createSupplier(input) {
+      const parsed = steelFrameSupplierDraftSchema.parse(input);
+      const { data, error } = await client.rpc("create_steel_frame_supplier", {
+        supplier_name: parsed.name,
+        supplier_tax_id: parsed.taxId,
+        supplier_contact_name: parsed.contactName,
+        supplier_phone: parsed.phone,
+        supplier_email: parsed.email,
+        supplier_notes: parsed.notes,
+      });
+
+      if (error) throw error;
+      return mapSupplierRow(data as CatalogRow);
+    },
+
+    async updateSupplier(input) {
+      const parsed = steelFrameSupplierUpdateSchema.parse(input);
+      const { data, error } = await client.rpc("update_steel_frame_supplier", {
+        target_supplier_id: parsed.supplierId,
+        supplier_name: parsed.name,
+        supplier_tax_id: parsed.taxId,
+        supplier_contact_name: parsed.contactName,
+        supplier_phone: parsed.phone,
+        supplier_email: parsed.email,
+        supplier_notes: parsed.notes,
+      });
+
+      if (error) throw error;
+      return mapSupplierRow(data as CatalogRow);
+    },
+
+    async archiveSupplier(input) {
+      const parsed = steelFrameSupplierArchiveSchema.parse(input);
+      const { data, error } = await client.rpc("archive_steel_frame_supplier", {
+        target_supplier_id: parsed.supplierId,
+        archive_reason_text: parsed.reason,
+      });
+
+      if (error) throw error;
+      return mapSupplierRow(data as CatalogRow);
     },
 
     async listSupplierQuotes() {

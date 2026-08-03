@@ -8,6 +8,7 @@ import { SupplierQuoteImport } from "./supplier-quote-import";
 
 const repositoryMocks = vi.hoisted(() => ({
   listTechnicalSources: vi.fn(),
+  listSuppliers: vi.fn(),
   listSupplierQuotes: vi.fn(),
   createSupplierQuote: vi.fn(),
 }));
@@ -42,6 +43,7 @@ vi.mock("@/lib/steel-frame/data", () => ({
 const sourceId = "11111111-1111-4111-8111-111111111111";
 const documentId = "22222222-2222-4222-8222-222222222222";
 const materialId = "33333333-3333-4333-8333-333333333333";
+const supplierId = "88888888-8888-4888-8888-888888888888";
 
 const source = {
   id: sourceId,
@@ -99,6 +101,23 @@ const material = {
   prices: [],
 };
 
+const supplier = {
+  id: supplierId,
+  createdBy: "44444444-4444-4444-8444-444444444444",
+  name: "Atacadao Drywall",
+  taxId: "03.321.303/0001-02",
+  contactName: "Comercial",
+  phone: "48999990000",
+  email: "comercial@fornecedor.com.br",
+  notes: null,
+  active: true,
+  archivedAt: null,
+  archivedBy: null,
+  archiveReason: null,
+  createdAt: "2026-08-02T22:00:00Z",
+  updatedAt: "2026-08-02T22:00:00Z",
+};
+
 const historicalQuote = {
   id: "66666666-6666-4666-8666-666666666666",
   status: "captured",
@@ -147,6 +166,7 @@ describe("SupplierQuoteImport", () => {
     vi.clearAllMocks();
     repositoryMocks.listTechnicalSources.mockResolvedValue([source]);
     repositoryMocks.listSupplierQuotes.mockResolvedValue([]);
+    repositoryMocks.listSuppliers.mockResolvedValue([supplier]);
     repositoryMocks.createSupplierQuote.mockResolvedValue({ id: "55555555-5555-4555-8555-555555555555" });
     dataMocks.listSteelFrameMaterials.mockResolvedValue([material]);
     dataMocks.registerSteelFrameMaterialPrice.mockResolvedValue({ id: "77777777-7777-4777-8777-777777777777" });
@@ -208,8 +228,12 @@ describe("SupplierQuoteImport", () => {
     await user.click(screen.getByRole("button", { name: "Confirmar sugestao" }));
     expect(await screen.findByText("Vinculo revisado pelo administrador.")).toBeInTheDocument();
 
+    await user.click(screen.getByRole("combobox", { name: "Fornecedor cadastrado da cotacao" }));
+    await user.click(await screen.findByRole("option", { name: "Atacadao Drywall" }));
+
     fireEvent.click(screen.getByRole("button", { name: "Registrar cotacao revisada" }));
     await waitFor(() => expect(repositoryMocks.createSupplierQuote).toHaveBeenCalledWith(expect.objectContaining({
+      supplierId,
       items: [expect.objectContaining({
         materialId,
         matchingStatus: "confirmed",

@@ -238,6 +238,12 @@ Ele adiciona edicao auditada, historico de precos com fonte e vigencia e
 arquivamento sem exclusao. Use o postflight somente leitura em
 `supabase/verification/steel_frame_material_catalog_lifecycle_postflight.sql`.
 
+O cadastro auditavel de fornecedores esta em
+`supabase/migrations/20260805000000_steel_frame_supplier_lifecycle.sql`.
+Ele permite criar, editar e arquivar fornecedores sem excluir cotacoes,
+materiais ou precos historicos. Valide a instalacao com o script somente leitura
+`supabase/verification/steel_frame_supplier_lifecycle_postflight.sql`.
+
 ## Scripts
 
 ```bash

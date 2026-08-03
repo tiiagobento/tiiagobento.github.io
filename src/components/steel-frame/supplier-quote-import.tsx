@@ -34,6 +34,7 @@ import {
   steelFrameSupplierQuoteDraftSchema,
   suggestSupplierQuoteMaterial,
   type SteelFrameCatalogTechnicalSource,
+  type SteelFrameSupplierRecord,
   type SteelFrameSupplierQuoteAnalysis,
   type SteelFrameSupplierQuoteMaterialSuggestion,
   type SteelFrameSupplierQuoteRecord,
@@ -61,6 +62,7 @@ type ReviewItem = {
 type EditableReviewItemField = Exclude<keyof ReviewItem, "matchingStatus" | "suggestion">;
 
 type QuoteForm = {
+  supplierId: string;
   supplierName: string;
   supplierTaxId: string;
   supplierContactName: string;
@@ -92,6 +94,7 @@ type QuotePriceForm = {
 };
 
 const emptyForm: QuoteForm = {
+  supplierId: "",
   supplierName: "",
   supplierTaxId: "",
   supplierContactName: "",
@@ -164,6 +167,7 @@ function makeReviewState(analysis: SteelFrameSupplierQuoteAnalysis, materials: S
   const warnings = analysis.warnings.length ? `\n\nAlertas da analise: ${analysis.warnings.join(" ")}` : "";
   return {
     form: {
+      supplierId: "",
       supplierName: textOrEmpty(analysis.supplier.name),
       supplierTaxId: textOrEmpty(analysis.supplier.tax_id),
       supplierContactName: textOrEmpty(analysis.supplier.contact_name),
@@ -191,6 +195,7 @@ export function SupplierQuoteImport() {
   const repository = React.useMemo(() => createSupabaseSteelFrameCatalogRepository(client), [client]);
   const [sources, setSources] = React.useState<SteelFrameCatalogTechnicalSource[]>([]);
   const [quotes, setQuotes] = React.useState<SteelFrameSupplierQuoteRecord[]>([]);
+  const [suppliers, setSuppliers] = React.useState<SteelFrameSupplierRecord[]>([]);
   const [materials, setMaterials] = React.useState<SteelFrameMaterialRecord[]>([]);
   const [selectedSourceId, setSelectedSourceId] = React.useState("");
   const [selectedDocumentId, setSelectedDocumentId] = React.useState("");
@@ -222,14 +227,16 @@ export function SupplierQuoteImport() {
     setLoading(true);
     setError(null);
     try {
-      const [loadedSources, loadedQuotes, loadedMaterials] = await Promise.all([
+      const [loadedSources, loadedQuotes, loadedMaterials, loadedSuppliers] = await Promise.all([
         repository.listTechnicalSources(),
         repository.listSupplierQuotes(),
         listSteelFrameMaterials(),
+        repository.listSuppliers(),
       ]);
       setSources(loadedSources);
       setQuotes(loadedQuotes);
       setMaterials(loadedMaterials);
+      setSuppliers(loadedSuppliers);
     } catch (loadError) {
       setError(getSteelFrameErrorMessage(loadError));
     } finally {
@@ -295,6 +302,24 @@ export function SupplierQuoteImport() {
     setForm((current) => ({ ...current, [field]: value }));
   }
 
+  function selectSupplier(supplierId: string) {
+    if (supplierId === "none") {
+      setForm((current) => ({ ...current, supplierId: "" }));
+      return;
+    }
+    const supplier = suppliers.find((candidate) => candidate.id === supplierId && candidate.active) ?? null;
+    if (!supplier) return;
+    setForm((current) => ({
+      ...current,
+      supplierId: supplier.id,
+      supplierName: supplier.name,
+      supplierTaxId: supplier.taxId ?? "",
+      supplierContactName: supplier.contactName ?? "",
+      supplierContactPhone: supplier.phone ?? "",
+      supplierContactEmail: supplier.email ?? "",
+    }));
+  }
+
   function updateItem(id: string, field: EditableReviewItemField, value: string) {
     setItems((current) => current.map((item) => {
       if (item.id !== id) return item;
@@ -336,7 +361,7 @@ export function SupplierQuoteImport() {
     const parsed = steelFrameSupplierQuoteDraftSchema.safeParse({
       sourceId: selectedSourceId,
       sourceDocumentId: selectedDocumentId,
-      supplierId: null,
+      supplierId: form.supplierId || null,
       supplierName: form.supplierName,
       supplierTaxId: form.supplierTaxId.trim() || null,
       supplierContactName: form.supplierContactName.trim() || null,
@@ -492,7 +517,7 @@ export function SupplierQuoteImport() {
         </Card>
       )}
 
-      {analysis ? <QuoteReview form={form} items={items} materials={materials} analysis={analysis} saving={saving} onFormChange={updateForm} onItemChange={updateItem} onConfirmSuggestion={confirmSuggestion} onAddItem={addItem} onRemoveItem={(id) => setItems((current) => current.filter((item) => item.id !== id))} onSave={() => void saveQuote()} /> : null}
+      {analysis ? <QuoteReview form={form} items={items} materials={materials} suppliers={suppliers.filter((supplier) => supplier.active)} analysis={analysis} saving={saving} onFormChange={updateForm} onSelectSupplier={selectSupplier} onItemChange={updateItem} onConfirmSuggestion={confirmSuggestion} onAddItem={addItem} onRemoveItem={(id) => setItems((current) => current.filter((item) => item.id !== id))} onSave={() => void saveQuote()} /> : null}
 
       <SupplierQuoteHistory
         quotes={quotes}
@@ -543,9 +568,11 @@ function QuoteReview({
   form,
   items,
   materials,
+  suppliers,
   analysis,
   saving,
   onFormChange,
+  onSelectSupplier,
   onItemChange,
   onConfirmSuggestion,
   onAddItem,
@@ -555,9 +582,11 @@ function QuoteReview({
   form: QuoteForm;
   items: ReviewItem[];
   materials: SteelFrameMaterialRecord[];
+  suppliers: SteelFrameSupplierRecord[];
   analysis: SteelFrameSupplierQuoteAnalysis;
   saving: boolean;
   onFormChange: (field: keyof QuoteForm, value: string) => void;
+  onSelectSupplier: (supplierId: string) => void;
   onItemChange: (id: string, field: EditableReviewItemField, value: string) => void;
   onConfirmSuggestion: (id: string) => void;
   onAddItem: () => void;
@@ -569,7 +598,7 @@ function QuoteReview({
       <CardHeader><CardTitle className="flex items-center gap-2 text-base text-primary"><ClipboardCheck className="size-4" /> Revisar antes de registrar</CardTitle><CardDescription>Confianca da IA: {Math.round(analysis.confidence * 100)}%. Ajuste qualquer campo incerto; o historico sera imutavel depois de salvo.</CardDescription></CardHeader>
       <CardContent className="space-y-5">
         {analysis.warnings.length ? <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.05] p-4"><p className="mb-2 text-sm font-medium text-foreground">Pontos para conferir</p><ul className="space-y-1 text-sm text-muted-foreground">{analysis.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></div> : null}
-        <section className="space-y-3"><p className="text-sm font-medium text-foreground">Fornecedor e cotacao</p><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3"><Field label="Fornecedor"><Input value={form.supplierName} onChange={(event) => onFormChange("supplierName", event.target.value)} /></Field><Field label="CNPJ / identificador"><Input value={form.supplierTaxId} onChange={(event) => onFormChange("supplierTaxId", event.target.value)} /></Field><Field label="Numero da cotacao"><Input value={form.quoteNumber} onChange={(event) => onFormChange("quoteNumber", event.target.value)} /></Field><Field label="Contato"><Input value={form.supplierContactName} onChange={(event) => onFormChange("supplierContactName", event.target.value)} /></Field><Field label="Telefone comercial"><Input value={form.supplierContactPhone} onChange={(event) => onFormChange("supplierContactPhone", event.target.value)} /></Field><Field label="Email comercial"><Input type="email" value={form.supplierContactEmail} onChange={(event) => onFormChange("supplierContactEmail", event.target.value)} /></Field><Field label="Data da cotacao"><Input type="date" value={form.issuedOn} onChange={(event) => onFormChange("issuedOn", event.target.value)} /></Field><Field label="Validade"><Input type="date" value={form.validUntil} onChange={(event) => onFormChange("validUntil", event.target.value)} /></Field><Field label="Previsao de faturamento"><Input type="date" value={form.expectedBillingOn} onChange={(event) => onFormChange("expectedBillingOn", event.target.value)} /></Field></div></section>
+        <section className="space-y-3"><p className="text-sm font-medium text-foreground">Fornecedor e cotacao</p><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3"><Field label="Fornecedor cadastrado"><Select value={form.supplierId || "none"} onValueChange={onSelectSupplier}><SelectTrigger aria-label="Fornecedor cadastrado da cotacao"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Sem vinculo cadastrado</SelectItem>{suppliers.map((supplier) => <SelectItem key={supplier.id} value={supplier.id}>{supplier.name}</SelectItem>)}</SelectContent></Select></Field><Field label="Fornecedor no documento"><Input value={form.supplierName} onChange={(event) => onFormChange("supplierName", event.target.value)} /></Field><Field label="CNPJ / identificador"><Input value={form.supplierTaxId} onChange={(event) => onFormChange("supplierTaxId", event.target.value)} /></Field><Field label="Numero da cotacao"><Input value={form.quoteNumber} onChange={(event) => onFormChange("quoteNumber", event.target.value)} /></Field><Field label="Contato"><Input value={form.supplierContactName} onChange={(event) => onFormChange("supplierContactName", event.target.value)} /></Field><Field label="Telefone comercial"><Input value={form.supplierContactPhone} onChange={(event) => onFormChange("supplierContactPhone", event.target.value)} /></Field><Field label="Email comercial"><Input type="email" value={form.supplierContactEmail} onChange={(event) => onFormChange("supplierContactEmail", event.target.value)} /></Field><Field label="Data da cotacao"><Input type="date" value={form.issuedOn} onChange={(event) => onFormChange("issuedOn", event.target.value)} /></Field><Field label="Validade"><Input type="date" value={form.validUntil} onChange={(event) => onFormChange("validUntil", event.target.value)} /></Field><Field label="Previsao de faturamento"><Input type="date" value={form.expectedBillingOn} onChange={(event) => onFormChange("expectedBillingOn", event.target.value)} /></Field></div><p className="text-xs text-muted-foreground">O vinculo aponta para o cadastro atual; os campos do documento ficam preservados como snapshot historico.</p></section>
         <section className="space-y-3"><p className="text-sm font-medium text-foreground">Valores e condicoes</p><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5"><Field label="Subtotal"><Input inputMode="decimal" value={form.subtotal} onChange={(event) => onFormChange("subtotal", event.target.value)} placeholder="0,00" /></Field><Field label="Desconto"><Input inputMode="decimal" value={form.discount} onChange={(event) => onFormChange("discount", event.target.value)} placeholder="0,00" /></Field><Field label="Frete"><Input inputMode="decimal" value={form.freight} onChange={(event) => onFormChange("freight", event.target.value)} placeholder="0,00" /></Field><Field label="Impostos"><Input inputMode="decimal" value={form.taxes} onChange={(event) => onFormChange("taxes", event.target.value)} placeholder="0,00" /></Field><Field label="Total"><Input required inputMode="decimal" value={form.total} onChange={(event) => onFormChange("total", event.target.value)} placeholder="0,00" /></Field></div><Field label="Condicoes de pagamento"><Input value={form.paymentTerms} onChange={(event) => onFormChange("paymentTerms", event.target.value)} placeholder="Ex: A vista" /></Field></section>
         <section className="space-y-3"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-medium text-foreground">Itens revisados</p><p className="mt-1 text-xs text-muted-foreground">Sugestoes nao sao confirmadas automaticamente. Vincule somente quando o produto comercial corresponder ao material interno.</p></div><Button type="button" size="sm" variant="outline" onClick={onAddItem}><Plus className="size-4" /> Adicionar item</Button></div>{items.length ? <div className="space-y-3">{items.map((item, index) => <QuoteItemEditor key={item.id} item={item} materials={materials} index={index} canRemove={items.length > 1} onChange={onItemChange} onConfirmSuggestion={onConfirmSuggestion} onRemove={onRemoveItem} />)}</div> : <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">A IA nao encontrou itens completos. Adicione-os manualmente antes de registrar a cotacao.</div>}</section>
         <Field label="Resumo e observacoes"><Textarea className="min-h-28" value={form.notes} onChange={(event) => onFormChange("notes", event.target.value)} /></Field>

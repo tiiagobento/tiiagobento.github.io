@@ -52,6 +52,24 @@ export const steelFrameTechnicalSourceDraftSchema = z.object({
   }
 });
 
+export const steelFrameSupplierDraftSchema = z.object({
+  name: z.string().trim().min(2, "Informe o nome do fornecedor.").max(240),
+  taxId: z.string().trim().max(80).nullable(),
+  contactName: z.string().trim().max(160).nullable(),
+  phone: z.string().trim().max(80).nullable(),
+  email: z.string().trim().email("Informe um email valido.").max(320).nullable(),
+  notes: z.string().trim().max(5_000).nullable(),
+});
+
+export const steelFrameSupplierUpdateSchema = steelFrameSupplierDraftSchema.extend({
+  supplierId: z.string().uuid(),
+});
+
+export const steelFrameSupplierArchiveSchema = z.object({
+  supplierId: z.string().uuid(),
+  reason: z.string().trim().min(3, "Informe o motivo do arquivamento.").max(1_000),
+});
+
 export const steelFrameCatalogRuleDraftSchema = z.object({
   id: identifier,
   code: z.string().trim().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{1,63}$/),

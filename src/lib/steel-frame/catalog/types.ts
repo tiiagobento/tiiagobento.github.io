@@ -112,6 +112,26 @@ export type SteelFrameCatalogTechnicalSourceDocumentDraft = {
   notes?: string | null;
 };
 
+export type SteelFrameSupplierDraft = {
+  name: string;
+  taxId: string | null;
+  contactName: string | null;
+  phone: string | null;
+  email: string | null;
+  notes: string | null;
+};
+
+export type SteelFrameSupplierRecord = SteelFrameSupplierDraft & {
+  id: string;
+  createdBy: string;
+  active: boolean;
+  archivedAt: string | null;
+  archivedBy: string | null;
+  archiveReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type SteelFrameCatalogRuleDraft = {
   id: string;
   code: string;

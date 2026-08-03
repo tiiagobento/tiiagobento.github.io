@@ -6,6 +6,8 @@ import type {
   SteelFrameCatalogTechnicalSourceDocument,
   SteelFrameCatalogTechnicalSourceDocumentDraft,
   SteelFrameCatalogTechnicalSourceDraft,
+  SteelFrameSupplierDraft,
+  SteelFrameSupplierRecord,
 } from "./types";
 import type {
   SteelFrameSupplierQuoteDraft,
@@ -31,6 +33,10 @@ export interface SteelFrameCatalogRepository {
     input: SteelFrameCatalogTechnicalSourceDocumentDraft,
   ): Promise<SteelFrameCatalogTechnicalSourceDocument>;
   deleteTechnicalSourceDocument(documentId: string): Promise<void>;
+  listSuppliers(): Promise<SteelFrameSupplierRecord[]>;
+  createSupplier(input: SteelFrameSupplierDraft): Promise<SteelFrameSupplierRecord>;
+  updateSupplier(input: SteelFrameSupplierDraft & { supplierId: string }): Promise<SteelFrameSupplierRecord>;
+  archiveSupplier(input: { supplierId: string; reason: string }): Promise<SteelFrameSupplierRecord>;
   listSupplierQuotes(): Promise<SteelFrameSupplierQuoteRecord[]>;
   createSupplierQuote(input: SteelFrameSupplierQuoteDraft): Promise<{ id: string }>;
   listApprovedRules(): Promise<SteelFrameCatalogRuleDraft[]>;

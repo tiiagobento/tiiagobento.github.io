@@ -35,6 +35,8 @@ Antes de aplicar, mantenha a ordem abaixo no SQL Editor ou no Supabase CLI:
 11. `supabase/migrations/20260801000000_steel_frame_phase_2_catalog_foundation.sql`
 12. `supabase/migrations/20260802000000_steel_frame_supplier_quote_history.sql`
 13. `supabase/migrations/20260803000000_steel_frame_cost_item_lifecycle.sql`
+14. `supabase/migrations/20260804000000_steel_frame_material_catalog_lifecycle.sql`
+15. `supabase/migrations/20260805000000_steel_frame_supplier_lifecycle.sql`
 
 A migration e aditiva e idempotente. Ela nao apaga leads, perfis, tarefas, interacoes ou arquivos existentes. Em especial, a relacao de um orcamento com um lead usa `ON DELETE SET NULL`, preservando o historico de precificacao caso um lead seja removido depois.
 
@@ -128,6 +130,6 @@ Itens de cotacoes historicas so podem originar um preco quando o vinculo ao
 material foi confirmado, o valor unitario e valido e um administrador confirma
 a nova vigencia. A cotacao original permanece imutavel.
 
-1. Edicao/arquivamento de fornecedores, composicoes e reforcos.
+1. Edicao/arquivamento de composicoes e reforcos.
 2. Criacao guiada de uma nova versao quando uma proposta congelada precisar de revisao.
 3. Sincronizacao offline de rascunhos e testes ponta a ponta autenticados.

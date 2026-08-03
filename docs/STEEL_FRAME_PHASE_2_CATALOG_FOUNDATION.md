@@ -74,6 +74,13 @@ nao aprova materiais, nao cria precos e nao substitui a revisao tecnica. Os
 PDFs comerciais recebidos como referencia nao sao carregados automaticamente
 no CRM nem transformados em dados de cliente.
 
+## Ciclo de fornecedores
+
+`supabase/migrations/20260805000000_steel_frame_supplier_lifecycle.sql`
+acrescenta cadastro, edicao e arquivamento auditaveis aos fornecedores. A
+exclusao fisica e bloqueada; cotacoes continuam com seu snapshot historico e
+podem apontar para o cadastro atual depois de confirmacao humana.
+
 ## Camada de dominio local
 
 `src/lib/steel-frame/catalog/` contem interfaces de repository, schemas Zod,
