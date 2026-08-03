@@ -86,6 +86,16 @@ describe("steel frame costing helpers", () => {
     expect(getCurrentMaterialPrice(material, new Date("2024-01-01T12:00:00Z"))).toBeNull();
   });
 
+  it("prefers the audited preferred price when two records share a start date", () => {
+    expect(getCurrentMaterialPrice({
+      ...material,
+      prices: [
+        { id: "old-same-day", unit_cost: 90, currency: "BRL", effective_from: "2026-08-03", effective_to: "2026-08-03", preferred: false, created_at: "2026-08-03T10:00:00Z" },
+        { id: "new-same-day", unit_cost: 98, currency: "BRL", effective_from: "2026-08-03", effective_to: null, preferred: true, created_at: "2026-08-03T11:00:00Z" },
+      ],
+    }, new Date("2026-08-03T12:00:00Z"))?.unitCost).toBe(98);
+  });
+
   it("builds calculation context from confirmed geometry", () => {
     expect(buildSteelFrameCalculationContext([wall()], [opening()])).toEqual({
       wallLengthMeters: 10,

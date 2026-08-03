@@ -24,7 +24,13 @@ export function getCurrentMaterialPrice(material: SteelFrameMaterialRecord, refe
   const today = referenceDate.toISOString().slice(0, 10);
   const currentPrices = (material.prices ?? [])
     .filter((price) => price.effective_from <= today && (!price.effective_to || price.effective_to >= today))
-    .sort((left, right) => right.effective_from.localeCompare(left.effective_from));
+    .sort((left, right) => {
+      if (Boolean(left.preferred) !== Boolean(right.preferred)) return left.preferred ? -1 : 1;
+      const effectiveOrder = right.effective_from.localeCompare(left.effective_from);
+      if (effectiveOrder !== 0) return effectiveOrder;
+      const createdOrder = (right.created_at ?? "").localeCompare(left.created_at ?? "");
+      return createdOrder !== 0 ? createdOrder : right.id.localeCompare(left.id);
+    });
   const price = currentPrices[0];
 
   return price

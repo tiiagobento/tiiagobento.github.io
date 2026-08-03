@@ -208,6 +208,33 @@ export const steelFrameCostItemArchiveSchema = z.object({
     .max(1000),
 });
 
+const steelFrameMaterialMetadataSchema = z.object({
+  name: z.string().trim().min(2, "Informe o nome do material.").max(160),
+  category: z.string().trim().min(2, "Informe a categoria.").max(120),
+  unit: z.string().trim().min(1, "Informe a unidade.").max(32),
+  sku: z.string().trim().max(120).nullable().optional(),
+});
+
+export const steelFrameMaterialDraftSchema = steelFrameMaterialMetadataSchema.extend({
+  initialUnitCost: nonNegativeNumber.max(100000000).nullable().optional(),
+});
+
+export const steelFrameMaterialUpdateSchema = steelFrameMaterialMetadataSchema.extend({
+  materialId: z.string().uuid(),
+});
+
+export const steelFrameMaterialPriceSchema = z.object({
+  materialId: z.string().uuid(),
+  unitCost: nonNegativeNumber.max(100000000),
+  effectiveFrom: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Informe a data de vigencia."),
+  sourceReference: z.string().trim().min(3, "Informe a fonte do preco.").max(500),
+});
+
+export const steelFrameMaterialArchiveSchema = z.object({
+  materialId: z.string().uuid(),
+  reason: z.string().trim().min(3, "Informe o motivo do arquivamento.").max(1000),
+});
+
 export const steelFrameEstimateVersionSchema = z.object({
   estimateId: z.string().uuid(),
   versionNumber: z.number().int().min(1),
@@ -349,5 +376,9 @@ export type SteelFrameCommercialComponentsInput = z.infer<
 export type SteelFrameCalculatedItemInput = z.infer<typeof steelFrameCalculatedItemSchema>;
 export type SteelFrameLaborItemInput = z.infer<typeof steelFrameLaborItemSchema>;
 export type SteelFrameOperationalCostInput = z.infer<typeof steelFrameOperationalCostSchema>;
+export type SteelFrameMaterialDraftInput = z.infer<typeof steelFrameMaterialDraftSchema>;
+export type SteelFrameMaterialUpdateInput = z.infer<typeof steelFrameMaterialUpdateSchema>;
+export type SteelFrameMaterialPriceInput = z.infer<typeof steelFrameMaterialPriceSchema>;
+export type SteelFrameMaterialArchiveInput = z.infer<typeof steelFrameMaterialArchiveSchema>;
 export type SteelFrameTechnicalRuleDraftInput = z.infer<typeof steelFrameTechnicalRuleDraftSchema>;
 export type SteelFrameTechnicalCompositionDraftInput = z.infer<typeof steelFrameTechnicalCompositionDraftSchema>;

@@ -232,6 +232,12 @@ O contrato local da persistencia versionada, catalogo e snapshots da Fase 2
 esta em `docs/STEEL_FRAME_PHASE_2_CATALOG_FOUNDATION.md`; a migration nao deve
 ser aplicada em producao ou em uma base parcial.
 
+O ciclo comercial de materiais e precos esta em
+`supabase/migrations/20260804000000_steel_frame_material_catalog_lifecycle.sql`.
+Ele adiciona edicao auditada, historico de precos com fonte e vigencia e
+arquivamento sem exclusao. Use o postflight somente leitura em
+`supabase/verification/steel_frame_material_catalog_lifecycle_postflight.sql`.
+
 ## Scripts
 
 ```bash

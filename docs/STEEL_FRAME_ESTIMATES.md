@@ -118,6 +118,12 @@ O resultado e validado por Zod, armazenado como uma extracao pendente de confirm
 
 ## Proximas fases
 
-1. Edicao/arquivamento de fornecedores, precos historicos, composicoes e reforcos.
+O catalogo comercial agora permite editar os metadados de materiais, registrar
+um novo preco com fonte e vigencia, consultar o historico e arquivar um material
+com motivo. A migration
+`20260804000000_steel_frame_material_catalog_lifecycle.sql` preserva todos os
+precos anteriores, audita materiais e precos e nao publica regras tecnicas.
+
+1. Edicao/arquivamento de fornecedores, composicoes e reforcos.
 2. Criacao guiada de uma nova versao quando uma proposta congelada precisar de revisao.
 3. Sincronizacao offline de rascunhos e testes ponta a ponta autenticados.

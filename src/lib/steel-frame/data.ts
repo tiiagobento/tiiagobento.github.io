@@ -34,6 +34,10 @@ import {
   steelFrameCalculatedItemSchema,
   steelFrameCostItemArchiveSchema,
   steelFrameLaborItemSchema,
+  steelFrameMaterialArchiveSchema,
+  steelFrameMaterialDraftSchema,
+  steelFrameMaterialPriceSchema,
+  steelFrameMaterialUpdateSchema,
   steelFrameOperationalCostSchema,
   steelFrameTechnicalCompositionDraftSchema,
   steelFrameTechnicalRuleDraftSchema,
@@ -251,7 +255,7 @@ export async function listSteelFrameMaterials() {
   const client = getClient();
   const { data, error } = await client
     .from("steel_frame_materials")
-    .select("*, prices:steel_frame_material_prices(id, unit_cost, currency, effective_from, effective_to)")
+    .select("*, prices:steel_frame_material_prices(id, unit_cost, currency, effective_from, effective_to, source_reference, preferred, created_at)")
     .eq("active", true)
     .order("category", { ascending: true })
     .order("name", { ascending: true });
@@ -260,26 +264,56 @@ export async function listSteelFrameMaterials() {
   return (data ?? []) as SteelFrameMaterialRecord[];
 }
 
-export async function createSteelFrameMaterial({
-  name,
-  category,
-  unit,
-  sku,
-  initialUnitCost,
-}: {
-  name: string;
-  category: string;
-  unit: string;
-  sku?: string | null;
-  initialUnitCost?: number | null;
-}) {
+export async function createSteelFrameMaterial(input: Parameters<typeof steelFrameMaterialDraftSchema.parse>[0]) {
+  const parsed = steelFrameMaterialDraftSchema.parse(input);
   const client = getClient();
   const { data, error } = await client.rpc("create_steel_frame_material", {
-    material_name: name.trim(),
-    material_category: category.trim(),
-    material_unit: unit.trim(),
-    material_sku: toNullableString(sku),
-    initial_unit_cost: initialUnitCost ?? null,
+    material_name: parsed.name,
+    material_category: parsed.category,
+    material_unit: parsed.unit,
+    material_sku: toNullableString(parsed.sku),
+    initial_unit_cost: parsed.initialUnitCost ?? null,
+  });
+
+  if (error) throw new Error(getSteelFrameErrorMessage(error));
+  return data as SteelFrameMaterialRecord;
+}
+
+export async function updateSteelFrameMaterial(input: Parameters<typeof steelFrameMaterialUpdateSchema.parse>[0]) {
+  const parsed = steelFrameMaterialUpdateSchema.parse(input);
+  const client = getClient();
+  const { data, error } = await client.rpc("update_steel_frame_material", {
+    target_material_id: parsed.materialId,
+    material_name: parsed.name,
+    material_category: parsed.category,
+    material_unit: parsed.unit,
+    material_sku: toNullableString(parsed.sku),
+  });
+
+  if (error) throw new Error(getSteelFrameErrorMessage(error));
+  return data as SteelFrameMaterialRecord;
+}
+
+export async function registerSteelFrameMaterialPrice(input: Parameters<typeof steelFrameMaterialPriceSchema.parse>[0]) {
+  const parsed = steelFrameMaterialPriceSchema.parse(input);
+  const client = getClient();
+  const { data, error } = await client.rpc("register_steel_frame_material_price", {
+    target_material_id: parsed.materialId,
+    new_unit_cost: parsed.unitCost,
+    price_effective_from: parsed.effectiveFrom,
+    price_source_reference: parsed.sourceReference,
+  });
+
+  if (error) throw new Error(getSteelFrameErrorMessage(error));
+  return data as NonNullable<SteelFrameMaterialRecord["prices"]>[number];
+}
+
+export async function archiveSteelFrameMaterial(input: Parameters<typeof steelFrameMaterialArchiveSchema.parse>[0]) {
+  const parsed = steelFrameMaterialArchiveSchema.parse(input);
+  const client = getClient();
+  const { data, error } = await client.rpc("archive_steel_frame_material", {
+    target_material_id: parsed.materialId,
+    archive_reason: parsed.reason,
   });
 
   if (error) throw new Error(getSteelFrameErrorMessage(error));

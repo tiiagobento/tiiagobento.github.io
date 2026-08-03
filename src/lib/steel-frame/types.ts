@@ -225,6 +225,9 @@ export type SteelFrameMaterialRecord = {
   unit: string;
   technical_specification: Record<string, unknown>;
   active: boolean;
+  archived_at?: string | null;
+  archived_by?: string | null;
+  archive_reason?: string | null;
   created_at: string;
   updated_at: string;
   prices?: Array<{
@@ -233,6 +236,9 @@ export type SteelFrameMaterialRecord = {
     currency: string;
     effective_from: string;
     effective_to: string | null;
+    source_reference?: string | null;
+    preferred?: boolean;
+    created_at?: string;
   }>;
 };
 
