@@ -33,6 +33,7 @@ export interface SteelFrameCatalogRepository {
   deleteTechnicalSourceDocument(documentId: string): Promise<void>;
   listSupplierQuotes(): Promise<SteelFrameSupplierQuoteRecord[]>;
   createSupplierQuote(input: SteelFrameSupplierQuoteDraft): Promise<{ id: string }>;
+  listApprovedRules(): Promise<SteelFrameCatalogRuleDraft[]>;
   getRule(ruleId: string): Promise<SteelFrameCatalogRuleDraft | null>;
   listMaterialPrices(input: {
     materialId: string;

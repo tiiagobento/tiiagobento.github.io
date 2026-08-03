@@ -201,7 +201,10 @@ export async function addSteelFrameWall(
       height_meters: input.heightMeters,
       quantity: input.quantity,
       confirmation_status: input.confirmationStatus,
-      source_data: input.sourceDescription ? { source_description: input.sourceDescription } : {},
+      source_data: {
+        ...(input.sourceData ?? {}),
+        ...(input.sourceDescription ? { source_description: input.sourceDescription } : {}),
+      },
       sort_order: sortOrder,
     })
     .select("*")
@@ -229,7 +232,10 @@ export async function addSteelFrameOpening(
       quantity: input.quantity,
       subtract_from_wall_area: input.subtractFromWallArea,
       confirmation_status: input.confirmationStatus,
-      source_data: input.sourceDescription ? { source_description: input.sourceDescription } : {},
+      source_data: {
+        ...(input.sourceData ?? {}),
+        ...(input.sourceDescription ? { source_description: input.sourceDescription } : {}),
+      },
       sort_order: sortOrder,
     })
     .select("*")

@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
-import { renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, cleanup, renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useCrmData } from "@/hooks/use-crm-data";
 import { leadFixture } from "@/test/fixtures";
 import type { Lead, PartnerNotification } from "@/lib/types";
 
@@ -115,10 +116,14 @@ vi.mock("@/lib/supabase/client", () => ({
   },
 }));
 
-async function renderCrmHook() {
-  vi.resetModules();
-  const { useCrmData } = await import("@/hooks/use-crm-data");
+function renderCrmHook() {
   return renderHook(() => useCrmData());
+}
+
+async function flushCrmEffects() {
+  await act(async () => {
+    for (let index = 0; index < 12; index += 1) await Promise.resolve();
+  });
 }
 
 describe("useCrmData CRUD", () => {
@@ -139,18 +144,27 @@ describe("useCrmData CRUD", () => {
     supabaseMocks.from.mockImplementation((table: string) => createTableBuilder(table));
   });
 
-  it("creates and edits leads through Supabase upsert", async () => {
-    const { result } = await renderCrmHook();
-    await waitFor(() => expect(result.current.loading).toBe(false));
+  afterEach(async () => {
+    cleanup();
+    await flushCrmEffects();
+  });
 
-    await result.current.saveLead({
-      name: "Lucas Ferreira",
-      phone: "(48) 99999-0000",
-      first_contact_date: "2026-07-07",
-      source: "Site",
-      status: "Novo lead",
-      priority: "Media",
+  it("creates and edits leads through Supabase upsert", async () => {
+    const { result } = renderCrmHook();
+    await flushCrmEffects();
+    expect(result.current.loading).toBe(false);
+
+    await act(async () => {
+      await result.current.saveLead({
+        name: "Lucas Ferreira",
+        phone: "(48) 99999-0000",
+        first_contact_date: "2026-07-07",
+        source: "Site",
+        status: "Novo lead",
+        priority: "Media",
+      });
     });
+    await flushCrmEffects();
 
     expect(db.upserts.at(-1)).toMatchObject({
       name: "Lucas Ferreira",
@@ -158,47 +172,62 @@ describe("useCrmData CRUD", () => {
       user_id: "user-1",
     });
 
-    await waitFor(() => expect(result.current.leads.some((lead) => lead.name === "Lucas Ferreira")).toBe(true));
+    expect(result.current.leads.some((lead) => lead.name === "Lucas Ferreira")).toBe(true);
 
-    await result.current.updateLead(db.leads[0].id, { priority: "Alta" });
+    await act(async () => {
+      await result.current.updateLead(db.leads[0].id, { priority: "Alta" });
+    });
+    await flushCrmEffects();
 
     expect(db.upserts.at(-1)).toMatchObject({ priority: "Alta" });
   });
 
   it("deletes leads through Supabase delete", async () => {
-    const { result } = await renderCrmHook();
-    await waitFor(() => expect(result.current.loading).toBe(false));
+    const { result } = renderCrmHook();
+    await flushCrmEffects();
+    expect(result.current.loading).toBe(false);
 
-    await result.current.deleteLead("lead-1");
+    await act(async () => {
+      await result.current.deleteLead("lead-1");
+    });
+    await flushCrmEffects();
 
     expect(db.deletes).toContain("lead-1");
   });
 
   it("records last contact through lead update", async () => {
-    const { result } = await renderCrmHook();
-    await waitFor(() => expect(result.current.loading).toBe(false));
+    const { result } = renderCrmHook();
+    await flushCrmEffects();
+    expect(result.current.loading).toBe(false);
 
-    await result.current.recordLastContact("lead-1");
+    await act(async () => {
+      await result.current.recordLastContact("lead-1");
+    });
+    await flushCrmEffects();
 
     expect(db.upserts.at(-1)).toMatchObject({ id: "lead-1" });
     expect((db.upserts.at(-1) as Lead).last_contact_at).toBeTruthy();
   });
 
   it("creates interaction and lets the Supabase trigger create its follow-up task", async () => {
-    const { result } = await renderCrmHook();
-    await waitFor(() => expect(result.current.loading).toBe(false));
+    const { result } = renderCrmHook();
+    await flushCrmEffects();
+    expect(result.current.loading).toBe(false);
 
-    await result.current.addInteraction(
-      "lead-1",
-      {
-        interaction_type: "WhatsApp",
-        responsible: "Tiago",
-        description: "Cliente pediu retorno com proposta.",
-        next_step: "Enviar proposta",
-        next_contact_at: "2026-07-10T13:00:00.000Z",
-      },
-      { status: "Orcamento a enviar" },
-    );
+    await act(async () => {
+      await result.current.addInteraction(
+        "lead-1",
+        {
+          interaction_type: "WhatsApp",
+          responsible: "Tiago",
+          description: "Cliente pediu retorno com proposta.",
+          next_step: "Enviar proposta",
+          next_contact_at: "2026-07-10T13:00:00.000Z",
+        },
+        { status: "Orcamento a enviar" },
+      );
+    });
+    await flushCrmEffects();
 
     expect(db.interactions[0]).toMatchObject({ lead_id: "lead-1", description: "Cliente pediu retorno com proposta." });
     expect(db.tasks).toHaveLength(0);
@@ -220,17 +249,21 @@ describe("useCrmData CRUD", () => {
       read_at: null,
       created_at: "2026-07-15T12:00:00.000Z",
     }];
-    const { result } = await renderCrmHook();
-    await waitFor(() => expect(result.current.loading).toBe(false));
+    const { result } = renderCrmHook();
+    await flushCrmEffects();
+    expect(result.current.loading).toBe(false);
 
-    await result.current.markPartnerNotificationRead("notification-1");
+    await act(async () => {
+      await result.current.markPartnerNotificationRead("notification-1");
+    });
+    await flushCrmEffects();
 
     expect(db.updates).toContainEqual(expect.objectContaining({
       table: "partner_notifications",
       id: "notification-1",
       payload: expect.objectContaining({ read_at: expect.any(String) }),
     }));
-    await waitFor(() => expect(result.current.notifications[0]?.read_at).toEqual(expect.any(String)));
+    expect(result.current.notifications[0]?.read_at).toEqual(expect.any(String));
   });
 
   it("keeps the CRM available before the additive notification migration is applied", async () => {
@@ -239,8 +272,9 @@ describe("useCrmData CRUD", () => {
       message: "Could not find the table 'public.partner_notifications' in the schema cache",
     };
 
-    const { result } = await renderCrmHook();
-    await waitFor(() => expect(result.current.loading).toBe(false));
+    const { result } = renderCrmHook();
+    await flushCrmEffects();
+    expect(result.current.loading).toBe(false);
 
     expect(result.current.leads).toHaveLength(1);
     expect(result.current.notifications).toEqual([]);

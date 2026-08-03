@@ -358,6 +358,22 @@ export function createSupabaseSteelFrameCatalogRepository(
       return { id };
     },
 
+    async listApprovedRules() {
+      const { data, error } = await client
+        .from("steel_frame_technical_rules")
+        .select(`
+          *,
+          source:steel_frame_technical_sources(id, title, edition, revision),
+          source_document:steel_frame_technical_source_documents(id, original_file_name)
+        `)
+        .eq("status", "approved")
+        .not("strategy_type", "is", null)
+        .order("name", { ascending: true });
+
+      if (error) throw error;
+      return ((data ?? []) as CatalogRow[]).map(mapRuleRow);
+    },
+
     async getRule(ruleId) {
       const { data, error } = await client
         .from("steel_frame_technical_rules")

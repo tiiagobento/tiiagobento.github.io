@@ -64,6 +64,7 @@ export type SteelFrameWallSegmentInput = {
   quantity: number;
   confirmationStatus: SteelFrameConfirmationStatus;
   sourceDescription?: string | null;
+  sourceData?: Record<string, unknown>;
 };
 
 export type SteelFrameOpeningInput = {
@@ -77,6 +78,7 @@ export type SteelFrameOpeningInput = {
   subtractFromWallArea: boolean;
   confirmationStatus: SteelFrameConfirmationStatus;
   sourceDescription?: string | null;
+  sourceData?: Record<string, unknown>;
 };
 
 export type SteelFrameAreaSummary = {

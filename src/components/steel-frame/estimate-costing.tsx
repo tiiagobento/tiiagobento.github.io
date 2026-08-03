@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { EstimateEngineCalculations } from "@/components/steel-frame/estimate-engine-calculations";
 import { calculateCommercialPricing, calculateMaterialQuantity } from "@/lib/steel-frame/calculator";
 import {
   buildSteelFrameCalculationContext,
@@ -406,6 +407,16 @@ export function EstimateCosting({ estimateId, walls, openings, readOnly = false 
         <CostMetric label="Operacionais" value={formatSteelFrameCurrency(directCosts.operationalCost)} icon={Factory} />
         <CostMetric label="Custo direto" value={formatSteelFrameCurrency(directCosts.directCost)} icon={Banknote} accent />
       </div>
+
+      <EstimateEngineCalculations
+        estimateId={estimateId}
+        walls={walls}
+        openings={openings}
+        materials={materials}
+        calculatedItems={snapshot.calculatedItems}
+        readOnly={readOnly}
+        onItemSaved={(item) => setSnapshot((current) => current ? { ...current, calculatedItems: [...current.calculatedItems, item] } : current)}
+      />
 
       <div className="grid gap-5 2xl:grid-cols-[1.3fr_0.9fr]">
         <Card className="border-primary/10">

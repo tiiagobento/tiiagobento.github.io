@@ -46,6 +46,7 @@ export const steelFrameWallSegmentSchema = z.object({
   quantity: z.number().int().min(1).max(10000),
   confirmationStatus: z.enum(steelFrameConfirmationStatuses),
   sourceDescription: z.string().trim().max(1000).nullable().optional(),
+  sourceData: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const steelFrameOpeningSchema = z.object({
@@ -59,6 +60,7 @@ export const steelFrameOpeningSchema = z.object({
   subtractFromWallArea: z.boolean(),
   confirmationStatus: z.enum(steelFrameConfirmationStatuses),
   sourceDescription: z.string().trim().max(1000).nullable().optional(),
+  sourceData: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const steelFrameCalculationRuleSchema = z

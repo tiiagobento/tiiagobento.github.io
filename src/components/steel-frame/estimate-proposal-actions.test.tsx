@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, cleanup, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createEstimateProposalPdf, EstimateProposalActions } from "./estimate-proposal-actions";
 
 const dataMocks = vi.hoisted(() => ({
@@ -48,13 +48,24 @@ const completeSnapshot = {
 describe("EstimateProposalActions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useRealTimers();
     dataMocks.getSteelFrameCosting.mockResolvedValue(completeSnapshot);
+  });
+
+  afterEach(async () => {
+    cleanup();
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    vi.useRealTimers();
   });
 
   it("uses stored costs to show a proposal preview after technical approval", async () => {
     render(<EstimateProposalActions estimate={estimate as never} onGenerated={vi.fn()} />);
+    await flushProposalEffect();
 
-    expect(await screen.findByText("Valor recomendado")).toBeInTheDocument();
+    expect(screen.getByText("Valor recomendado")).toBeInTheDocument();
     expect(screen.getByText("R$ 1.750,00")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Gerar proposta PDF" })).toBeInTheDocument();
   });
@@ -63,8 +74,9 @@ describe("EstimateProposalActions", () => {
     dataMocks.getSteelFrameCosting.mockResolvedValue({ ...completeSnapshot, commercialComponents: [] });
 
     render(<EstimateProposalActions estimate={estimate as never} onGenerated={vi.fn()} />);
+    await flushProposalEffect();
 
-    await waitFor(() => expect(screen.getByText("Configure todos os componentes comerciais antes de gerar a proposta.")).toBeInTheDocument());
+    expect(screen.getByText("Configure todos os componentes comerciais antes de gerar a proposta.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Gerar proposta PDF" })).not.toBeInTheDocument();
   });
 
@@ -94,6 +106,15 @@ describe("EstimateProposalActions", () => {
     expect(pdf.content).not.toContain("123.45");
   });
 });
+
+async function flushProposalEffect() {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
 
 class ProposalPdfSpy {
   content: string[] = [];

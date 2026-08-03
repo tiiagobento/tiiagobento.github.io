@@ -26,6 +26,7 @@ import type {
   SteelFrameDocumentRecord,
   SteelFrameDocumentType,
   SteelFrameDocumentVisibility,
+  SteelFrameWallSegmentRecord,
 } from "@/lib/steel-frame/types";
 
 function formatUploadedAt(value: string) {
@@ -36,12 +37,14 @@ export function EstimateDocuments({
   estimateId,
   wallCount,
   openingCount,
+  walls = [],
   onGeometryChanged,
   readOnly = false,
 }: {
   estimateId: string;
   wallCount: number;
   openingCount: number;
+  walls?: SteelFrameWallSegmentRecord[];
   onGeometryChanged: () => Promise<void> | void;
   readOnly?: boolean;
 }) {
@@ -143,7 +146,7 @@ export function EstimateDocuments({
         {loading ? <div className="flex items-center gap-2 rounded-lg border border-dashed p-4 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" /> Carregando documentos...</div> : null}
         {!loading && !error && !documents.length ? <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">Nenhuma planta, croqui, foto ou PDF foi anexado a este orcamento.</p> : null}
         {!loading && documents.length ? <div className="space-y-2">{documents.map((document) => <div key={document.id} className="flex flex-col gap-3 rounded-xl border bg-card p-3 shadow-xs sm:flex-row sm:items-center sm:justify-between"><div className="flex min-w-0 items-center gap-3"><span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-secondary text-primary"><FileArchive className="size-4" /></span><div className="min-w-0"><p className="truncate text-sm font-medium text-foreground">{document.original_file_name}</p><p className="mt-0.5 text-xs text-muted-foreground">{steelFrameDocumentTypeOptions.find((option) => option.value === document.document_type)?.label ?? document.document_type} · {formatSteelFrameDocumentSize(Number(document.file_size_bytes))} · {formatUploadedAt(document.created_at)}</p></div></div><div className="flex shrink-0 gap-2"><Button type="button" variant="outline" size="sm" onClick={() => void openDocument(document)}><Download className="size-4" /> Abrir</Button>{!readOnly ? <Button type="button" variant="outline" size="icon" aria-label={`Excluir ${document.original_file_name}`} onClick={() => void removeDocument(document)} disabled={removingId === document.id}>{removingId === document.id ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4 text-destructive" />}</Button> : null}</div></div>)}</div> : null}
-        {!loading && !error && documents.length && !readOnly ? <EstimateDocumentAnalysis estimateId={estimateId} documents={documents} wallCount={wallCount} openingCount={openingCount} onGeometryChanged={onGeometryChanged} /> : null}
+        {!loading && !error && documents.length && !readOnly ? <EstimateDocumentAnalysis estimateId={estimateId} documents={documents} wallCount={wallCount} openingCount={openingCount} existingWalls={walls} onGeometryChanged={onGeometryChanged} /> : null}
       </CardContent>
     </Card>
   );

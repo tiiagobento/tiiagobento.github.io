@@ -26,6 +26,7 @@ const document = {
 };
 
 afterEach(() => {
+  vi.clearAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -65,5 +66,63 @@ describe("EstimateDocumentAnalysis", () => {
     expect(screen.getByDisplayValue("5")).toBeInTheDocument();
     expect(dataMocks.addSteelFrameWall).not.toHaveBeenCalled();
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/ai/extract-estimate", expect.objectContaining({ method: "POST" })));
+  });
+
+  it("links an extracted opening to its reviewed wall and persists the AI evidence", async () => {
+    const wallId = "11111111-1111-4111-8111-111111111111";
+    dataMocks.addSteelFrameWall.mockResolvedValue({ id: wallId });
+    dataMocks.addSteelFrameOpening.mockResolvedValue({ id: "opening-1" });
+    dataMocks.addSteelFrameAICorrection.mockResolvedValue(undefined);
+    vi.stubGlobal("fetch", vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        extractionId: "extraction-1",
+        analysis: {
+          summary: "Parede e janela identificadas.",
+          estimate: { title: null, city: null, neighborhood: null, approximate_address: null, project_type: null, standard_wall_height_meters: null, expected_floors: null },
+          walls: [{
+            label: "Parede A",
+            length_meters: 6,
+            height_meters: 3,
+            quantity: 1,
+            confidence: 0.7,
+            evidence: { document_index: 1, page_number: 2, source_text: "Parede A 6,00 m", bounding_box: null },
+          }],
+          openings: [{
+            label: "Janela A",
+            opening_type: "window",
+            width_meters: 1.2,
+            height_meters: 1.2,
+            quantity: 1,
+            wall_label: "Parede A",
+            confidence: 0.65,
+            evidence: { document_index: 1, page_number: 2, source_text: "J1 1,20 x 1,20", bounding_box: null },
+          }],
+          missing_information: [],
+          warnings: [],
+          confidence: 0.68,
+        },
+      }),
+    })));
+
+    render(<EstimateDocumentAnalysis estimateId="estimate-1" documents={[document] as unknown as SteelFrameDocumentRecord[]} wallCount={0} openingCount={0} onGeometryChanged={vi.fn()} />);
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Analisar com IA" }));
+
+    expect(await screen.findByText("Parede e janela identificadas.")).toBeInTheDocument();
+    expect(screen.getAllByText("Doc. 1, pag. 2")).toHaveLength(2);
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar itens revisados" }));
+
+    await waitFor(() => expect(dataMocks.addSteelFrameOpening).toHaveBeenCalledWith(
+      "estimate-1",
+      expect.objectContaining({
+        wallSegmentId: wallId,
+        sourceData: expect.objectContaining({
+          ai_confidence: 0.65,
+          ai_evidence: expect.objectContaining({ source_text: "J1 1,20 x 1,20" }),
+        }),
+      }),
+      0,
+    ));
   });
 });

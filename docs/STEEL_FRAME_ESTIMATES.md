@@ -2,14 +2,14 @@
 
 ## Estado atual
 
-O modulo tem uma fundacao segura e auditavel e uma primeira interface operacional para fluxo manual:
+O modulo tem uma fundacao segura e auditavel e uma interface operacional que combina IA, motor tipado e revisao humana:
 
 - lista de orcamentos, criacao a partir de um lead ou manual e ficha de geometria;
 - catalogo de materiais com preco inicial cadastrado por permissao;
-- itens calculados por regra explicita, mao de obra, custos operacionais e composicao comercial;
+- itens calculados pelo motor tipado com regra aprovada, explicacao e plano de corte, mantendo o calculo manual como contingencia;
 - custo direto, preco minimo, preco recomendado e desconto maximo derivados somente dos dados salvos;
 - upload privado de plantas, croquis, fotos e PDFs, com URL assinada curta para abertura;
-- analise documental pelo Gemini, com rascunho editavel, confianca/evidencia e correcao humana auditada;
+- analise documental pelo Gemini, com rascunho editavel, confianca/evidencia por item, modo de revisar somente pendencias, vinculo de abertura a parede e correcao humana auditada;
 - aprovacao tecnica atomica que registra a decisao e congela a versao corrente;
 - proposta comercial em PDF vetorial, calculada somente a partir dos custos e percentuais persistidos e vinculada a versao tecnica aprovada;
 - navegacao por permissao e mensagens acionaveis quando a migration ainda nao estiver aplicada.
@@ -30,6 +30,8 @@ Antes de aplicar, mantenha a ordem abaixo no SQL Editor ou no Supabase CLI:
 8. `supabase/migrations/add_permission_audit_details.sql`
 9. `supabase/migrations/add_steel_frame_estimates.sql`
 10. `supabase/migrations/add_steel_frame_technical_rules.sql`
+11. `supabase/migrations/20260801000000_steel_frame_phase_2_catalog_foundation.sql`
+12. `supabase/migrations/20260802000000_steel_frame_supplier_quote_history.sql`
 
 A migration e aditiva e idempotente. Ela nao apaga leads, perfis, tarefas, interacoes ou arquivos existentes. Em especial, a relacao de um orcamento com um lead usa `ON DELETE SET NULL`, preservando o historico de precificacao caso um lead seja removido depois.
 
@@ -58,7 +60,15 @@ Uma unica excecao controlada e o PDF de proposta: ele so pode ser anexado como d
 
 ## Motor deterministico
 
-O codigo em `src/lib/steel-frame/calculator.ts` nao embute regras tecnicas, precos ou espessuras de Steel Frame. Ele so calcula a partir de valores cadastrados no catalogo e de parametros confirmados.
+O motor tipado em `src/lib/steel-frame/engine/` nao embute regras tecnicas, precos ou espessuras de Steel Frame. A ficha do orcamento lista somente regras com status `approved`, valida o contrato Zod, converte a geometria confirmada em contexto mensuravel e preserva no item salvo a regra, fonte, versao, explicacao, alertas e plano de corte. Regras bloqueadas nunca podem ser adicionadas ao custo.
+
+Para o vinculo automatico entre regra e material, use em `steel_frame_materials.technical_specification` uma das chaves abaixo:
+
+- `technical_rule_id` com o ID da regra;
+- `technical_rule_code` com o codigo versionado da regra;
+- `strategy_type` com a estrategia do motor.
+
+Quando nao houver correspondencia unica, o usuario escolhe o material no proprio painel. O preco precisa estar vigente; o sistema nao inventa preco nem coeficiente. O calculador anterior em `src/lib/steel-frame/calculator.ts` permanece disponivel para itens manuais e contingencias identificadas.
 
 Regras aceitas:
 
@@ -100,7 +110,7 @@ O bucket `steel-frame-documents` e privado. O navegador grava primeiro o metadad
 
 A rota `POST /api/ai/extract-estimate` recebe apenas IDs de documentos ja autorizados. No servidor ela resolve os objetos pelo cliente Supabase da sessao, baixa os bytes em memoria e chama o provider configurado. Para documentos, o fluxo aceita somente `gemini` (ou `mock` no desenvolvimento), pois PDFs, plantas e imagens sao enviados como `inlineData` para um provider multimodal. A chave de IA nunca vai ao navegador.
 
-O resultado e validado por Zod, armazenado como uma extracao pendente de confirmacao e apresentado como campos editaveis. Somente o clique explicito em `Adicionar itens revisados` grava paredes e aberturas. Qualquer diferenca entre a sugestao e o valor confirmado gera uma entrada em `steel_frame_ai_corrections`.
+O resultado e validado por Zod, armazenado como uma extracao pendente de confirmacao e apresentado como campos editaveis. A revisao mostra confianca, documento, pagina e trecho de evidencia. Quando a IA informa `wall_label`, a abertura e vinculada a parede revisada ou a uma parede ja salva; vinculos incertos continuam como `A confirmar`. Somente o clique explicito em `Adicionar itens revisados` grava paredes e aberturas. A evidencia segue em `source_data` e qualquer diferenca entre a sugestao e o valor confirmado gera uma entrada em `steel_frame_ai_corrections`.
 
 ## Proximas fases
 

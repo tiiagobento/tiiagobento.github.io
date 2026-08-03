@@ -108,4 +108,55 @@ describe("Supabase Steel Frame catalog repository", () => {
     }));
     expect(mock.insert).not.toHaveBeenCalledWith(expect.objectContaining({ status: "approved" }));
   });
+
+  it("lists only approved typed rules for the estimate engine", async () => {
+    const ruleRow = {
+      id: "rule-1",
+      code: "STUD-090",
+      version: "1.0",
+      name: "Montantes 90 mm",
+      strategy_type: "STUD_BY_SPACING",
+      parameter_schema_version: 1,
+      technical_input_unit: "m",
+      purchase_unit: "bar",
+      parameters: {
+        spacingMeters: 0.4,
+        initialStudsPerWall: 1,
+        endStudsPerWall: 1,
+        manualExtraStuds: 0,
+        commercialStock: {
+          commercialBars: [{ id: "bar-6", label: "Barra 6 m", lengthMeters: 6, availableQuantity: null }],
+          kerfMeters: 0,
+          reusableLeftovers: [],
+          minimumReusableLeftoverMeters: 0.2,
+        },
+      },
+      limits: {},
+      application_scope: { wallIds: [], openingIds: [] },
+      status: "approved",
+      source_id: "source-1",
+      source_document_id: "document-1",
+      source: { title: "Composicao aprovada", edition: "1.0", revision: null },
+      source_document: { original_file_name: "manual.pdf" },
+      reference_name: "Composicao aprovada",
+      reference_version: "1.0",
+      technical_responsible_name: "Responsavel tecnico",
+      technical_responsible_registration: "CREA-TESTE",
+      effective_from: "2026-01-01",
+      effective_to: null,
+      approved_by: "admin-1",
+    };
+    const order = vi.fn().mockResolvedValue({ data: [ruleRow], error: null });
+    const not = vi.fn().mockReturnValue({ order });
+    const eq = vi.fn().mockReturnValue({ not });
+    const select = vi.fn().mockReturnValue({ eq });
+    const from = vi.fn().mockReturnValue({ select });
+    const repository = createSupabaseSteelFrameCatalogRepository({ from } as unknown as SupabaseClient);
+
+    await expect(repository.listApprovedRules()).resolves.toEqual([
+      expect.objectContaining({ id: "rule-1", strategyType: "STUD_BY_SPACING", status: "approved" }),
+    ]);
+    expect(eq).toHaveBeenCalledWith("status", "approved");
+    expect(not).toHaveBeenCalledWith("strategy_type", "is", null);
+  });
 });

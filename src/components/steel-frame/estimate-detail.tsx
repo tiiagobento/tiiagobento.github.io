@@ -313,6 +313,7 @@ export function EstimateDetail({ estimateId }: EstimateDetailProps) {
         estimateId={estimate.id}
         wallCount={walls.length}
         openingCount={openings.length}
+        walls={walls}
         onGeometryChanged={load}
         readOnly={isReadOnly}
       />
