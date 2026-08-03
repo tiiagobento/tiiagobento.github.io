@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Archive,
   Banknote,
   Boxes,
   Calculator,
@@ -8,13 +9,31 @@ import {
   Factory,
   HardHat,
   PackagePlus,
+  Pencil,
   Save,
   ShieldCheck,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -30,22 +49,29 @@ import {
   sumSteelFrameDirectCosts,
 } from "@/lib/steel-frame/costing";
 import {
+  adjustSteelFrameCalculatedItem,
   addSteelFrameCalculatedItem,
   addSteelFrameLaborItem,
   addSteelFrameOperationalCost,
+  archiveSteelFrameCostItem,
   getSteelFrameCosting,
   getSteelFrameErrorMessage,
   listSteelFrameMaterials,
+  updateSteelFrameLaborItem,
+  updateSteelFrameOperationalCost,
   upsertSteelFrameCommercialComponents,
 } from "@/lib/steel-frame/data";
 import type {
+  SteelFrameCalculatedItemRecord,
   SteelFrameCalculatedQuantity,
   SteelFrameCalculationContext,
   SteelFrameCalculationRuleType,
   SteelFrameCommercialComponents,
   SteelFrameCostingSnapshot,
+  SteelFrameLaborItemRecord,
   SteelFrameMaterialRecord,
   SteelFrameOpeningRecord,
+  SteelFrameOperationalCostRecord,
   SteelFrameWallSegmentRecord,
 } from "@/lib/steel-frame/types";
 
@@ -75,6 +101,39 @@ type CommercialForm = {
   platformCommissionPercentOfSale: string;
   targetMarginPercentOfSale: string;
   maxDiscountPercent: string;
+};
+
+type EditingCostItem =
+  | { type: "calculated"; item: SteelFrameCalculatedItemRecord }
+  | { type: "labor"; item: SteelFrameLaborItemRecord }
+  | { type: "operational"; item: SteelFrameOperationalCostRecord };
+
+type CostItemEditForm = {
+  label: string;
+  category: string;
+  unit: string;
+  quantity: string;
+  unitCost: string;
+  amount: string;
+  notes: string;
+  justification: string;
+};
+
+type ArchiveTarget = {
+  type: EditingCostItem["type"];
+  id: string;
+  label: string;
+};
+
+const emptyCostItemEditForm: CostItemEditForm = {
+  label: "",
+  category: "",
+  unit: "",
+  quantity: "",
+  unitCost: "",
+  amount: "",
+  notes: "",
+  justification: "",
 };
 
 const initialCalculationForm: CalculationForm = {
@@ -167,6 +226,12 @@ export function EstimateCosting({ estimateId, walls, openings, readOnly = false 
   const [savingLabor, setSavingLabor] = useState(false);
   const [savingOperational, setSavingOperational] = useState(false);
   const [savingCommercial, setSavingCommercial] = useState(false);
+  const [editingItem, setEditingItem] = useState<EditingCostItem | null>(null);
+  const [editForm, setEditForm] = useState<CostItemEditForm>(emptyCostItemEditForm);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [archiveTarget, setArchiveTarget] = useState<ArchiveTarget | null>(null);
+  const [archiveReason, setArchiveReason] = useState("");
+  const [archiving, setArchiving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -381,6 +446,120 @@ export function EstimateCosting({ estimateId, walls, openings, readOnly = false 
     }
   }
 
+  function beginEdit(item: EditingCostItem) {
+    setEditingItem(item);
+    if (item.type === "calculated") {
+      setEditForm({
+        ...emptyCostItemEditForm,
+        label: item.item.label,
+        quantity: String(item.item.calculated_quantity),
+        unitCost: String(item.item.unit_cost),
+      });
+      return;
+    }
+    if (item.type === "labor") {
+      setEditForm({
+        ...emptyCostItemEditForm,
+        label: item.item.label,
+        unit: item.item.unit,
+        quantity: String(item.item.quantity),
+        unitCost: String(item.item.unit_cost),
+        notes: item.item.notes ?? "",
+      });
+      return;
+    }
+    setEditForm({
+      ...emptyCostItemEditForm,
+      label: item.item.label,
+      category: item.item.category,
+      amount: String(item.item.amount),
+      notes: item.item.notes ?? "",
+    });
+  }
+
+  async function saveEditedItem(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editingItem) return;
+
+    setSavingEdit(true);
+    try {
+      if (editingItem.type === "calculated") {
+        const updated = await adjustSteelFrameCalculatedItem(editingItem.item, {
+          label: editForm.label,
+          calculatedQuantity: parseDecimal(editForm.quantity),
+          unitCost: parseDecimal(editForm.unitCost),
+          justification: editForm.justification,
+        });
+        setSnapshot((current) => current ? {
+          ...current,
+          calculatedItems: current.calculatedItems.map((item) => item.id === updated.id ? updated : item),
+        } : current);
+      } else if (editingItem.type === "labor") {
+        const updated = await updateSteelFrameLaborItem(editingItem.item, {
+          label: editForm.label,
+          quantity: parseDecimal(editForm.quantity),
+          unit: editForm.unit,
+          unitCost: parseDecimal(editForm.unitCost),
+          notes: editForm.notes,
+        });
+        setSnapshot((current) => current ? {
+          ...current,
+          laborItems: current.laborItems.map((item) => item.id === updated.id ? updated : item),
+        } : current);
+      } else {
+        const updated = await updateSteelFrameOperationalCost(editingItem.item, {
+          category: editForm.category,
+          label: editForm.label,
+          amount: parseDecimal(editForm.amount),
+          notes: editForm.notes,
+        });
+        setSnapshot((current) => current ? {
+          ...current,
+          operationalCosts: current.operationalCosts.map((item) => item.id === updated.id ? updated : item),
+        } : current);
+      }
+      setEditingItem(null);
+      setEditForm(emptyCostItemEditForm);
+      toast.success("Item atualizado e registrado na auditoria.");
+    } catch (saveError) {
+      toast.error(getSteelFrameErrorMessage(saveError));
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  async function confirmArchive() {
+    if (!archiveTarget || !snapshot) return;
+    setArchiving(true);
+    try {
+      await archiveSteelFrameCostItem({
+        estimateId,
+        itemId: archiveTarget.id,
+        itemType: archiveTarget.type,
+        reason: archiveReason,
+      });
+      setSnapshot((current) => current ? {
+        ...current,
+        calculatedItems: archiveTarget.type === "calculated"
+          ? current.calculatedItems.filter((item) => item.id !== archiveTarget.id)
+          : current.calculatedItems,
+        laborItems: archiveTarget.type === "labor"
+          ? current.laborItems.filter((item) => item.id !== archiveTarget.id)
+          : current.laborItems,
+        operationalCosts: archiveTarget.type === "operational"
+          ? current.operationalCosts.filter((item) => item.id !== archiveTarget.id)
+          : current.operationalCosts,
+      } : current);
+      setArchiveTarget(null);
+      setArchiveReason("");
+      toast.success("Item arquivado sem apagar o historico.");
+    } catch (archiveError) {
+      toast.error(getSteelFrameErrorMessage(archiveError));
+    } finally {
+      setArchiving(false);
+    }
+  }
+
   if (loading) return <EstimateCostingSkeleton />;
 
   if (error || !snapshot) {
@@ -468,7 +647,20 @@ export function EstimateCosting({ estimateId, walls, openings, readOnly = false 
               </form>
             ) : <EmptyCosting label="Cadastre materiais e precos vigentes no catalogo antes de calcular quantitativos." />}
 
-            <CostList title="Itens de materiais" emptyLabel="Nenhum item calculado ainda." rows={snapshot.calculatedItems.map((item) => ({ id: item.id, title: item.label, detail: `${item.calculated_quantity} ${item.unit} · ${item.calculation_rule}`, value: formatSteelFrameCurrency(Number(item.total_cost)), review: item.requires_technical_review }))} />
+            <CostList
+              title="Itens de materiais"
+              emptyLabel="Nenhum item calculado ainda."
+              readOnly={readOnly}
+              rows={snapshot.calculatedItems.map((item) => ({
+                id: item.id,
+                title: item.label,
+                detail: `${item.calculated_quantity} ${item.unit} · ${item.calculation_rule}`,
+                value: formatSteelFrameCurrency(Number(item.total_cost)),
+                review: item.requires_technical_review,
+                onEdit: () => beginEdit({ type: "calculated", item }),
+                onArchive: () => setArchiveTarget({ type: "calculated", id: item.id, label: item.label }),
+              }))}
+            />
           </CardContent>
         </Card>
 
@@ -476,7 +668,19 @@ export function EstimateCosting({ estimateId, walls, openings, readOnly = false 
           <Card className="border-primary/10">
             <CardHeader><CardTitle className="flex items-center gap-2 text-base text-primary"><HardHat className="size-4" /> Mao de obra</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              <CostList title="" emptyLabel="Nenhuma mao de obra adicionada." rows={snapshot.laborItems.map((item) => ({ id: item.id, title: item.label, detail: `${item.quantity} ${item.unit} x ${formatSteelFrameCurrency(Number(item.unit_cost))}`, value: formatSteelFrameCurrency(Number(item.total_cost)) }))} />
+              <CostList
+                title=""
+                emptyLabel="Nenhuma mao de obra adicionada."
+                readOnly={readOnly}
+                rows={snapshot.laborItems.map((item) => ({
+                  id: item.id,
+                  title: item.label,
+                  detail: `${item.quantity} ${item.unit} x ${formatSteelFrameCurrency(Number(item.unit_cost))}`,
+                  value: formatSteelFrameCurrency(Number(item.total_cost)),
+                  onEdit: () => beginEdit({ type: "labor", item }),
+                  onArchive: () => setArchiveTarget({ type: "labor", id: item.id, label: item.label }),
+                }))}
+              />
               <form className="grid gap-3 border-t border-border/70 pt-4 sm:grid-cols-2" onSubmit={saveLabor}>
                 <fieldset disabled={readOnly} className="contents">
                 <FormField label="Descricao"><Input value={laborForm.label} onChange={(event) => setLaborForm((current) => ({ ...current, label: event.target.value }))} placeholder="Ex: Montagem de paines" /></FormField>
@@ -493,7 +697,19 @@ export function EstimateCosting({ estimateId, walls, openings, readOnly = false 
           <Card className="border-primary/10">
             <CardHeader><CardTitle className="flex items-center gap-2 text-base text-primary"><Factory className="size-4" /> Custos operacionais</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              <CostList title="" emptyLabel="Nenhum custo operacional adicionado." rows={snapshot.operationalCosts.map((item) => ({ id: item.id, title: item.label, detail: item.category, value: formatSteelFrameCurrency(Number(item.amount)) }))} />
+              <CostList
+                title=""
+                emptyLabel="Nenhum custo operacional adicionado."
+                readOnly={readOnly}
+                rows={snapshot.operationalCosts.map((item) => ({
+                  id: item.id,
+                  title: item.label,
+                  detail: item.category,
+                  value: formatSteelFrameCurrency(Number(item.amount)),
+                  onEdit: () => beginEdit({ type: "operational", item }),
+                  onArchive: () => setArchiveTarget({ type: "operational", id: item.id, label: item.label }),
+                }))}
+              />
               <form className="grid gap-3 border-t border-border/70 pt-4 sm:grid-cols-2" onSubmit={saveOperationalCost}>
                 <fieldset disabled={readOnly} className="contents">
                 <FormField label="Categoria"><Input value={operationalForm.category} onChange={(event) => setOperationalForm((current) => ({ ...current, category: event.target.value }))} placeholder="Ex: Logistica" /></FormField>
@@ -529,6 +745,146 @@ export function EstimateCosting({ estimateId, walls, openings, readOnly = false 
           {commercialPreview?.warnings.length ? <div className="rounded-lg border border-amber-500/30 bg-amber-500/[0.06] p-3 text-sm text-amber-900 dark:text-amber-100">{commercialPreview.warnings.map((warning) => <p key={warning}>{warning}</p>)}</div> : null}
         </CardContent>
       </Card>
+
+      <Dialog
+        open={Boolean(editingItem)}
+        onOpenChange={(open) => {
+          if (!open && !savingEdit) {
+            setEditingItem(null);
+            setEditForm(emptyCostItemEditForm);
+          }
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {editingItem?.type === "calculated" ? "Ajustar item de material" : "Editar item de custo"}
+            </DialogTitle>
+            <DialogDescription>
+              {editingItem?.type === "calculated"
+                ? "O ajuste manual preserva a regra anterior, exige justificativa e volta para revisao tecnica."
+                : "A alteracao fica registrada na auditoria deste orcamento."}
+            </DialogDescription>
+          </DialogHeader>
+          <form className="space-y-4" onSubmit={saveEditedItem}>
+            <FormField label="Descricao">
+              <Input
+                value={editForm.label}
+                onChange={(event) => setEditForm((current) => ({ ...current, label: event.target.value }))}
+                autoFocus
+              />
+            </FormField>
+            {editingItem?.type === "operational" ? (
+              <FormField label="Categoria">
+                <Input
+                  value={editForm.category}
+                  onChange={(event) => setEditForm((current) => ({ ...current, category: event.target.value }))}
+                />
+              </FormField>
+            ) : null}
+            {editingItem?.type === "operational" ? (
+              <FormField label="Valor">
+                <Input
+                  inputMode="decimal"
+                  value={editForm.amount}
+                  onChange={(event) => setEditForm((current) => ({ ...current, amount: event.target.value }))}
+                />
+              </FormField>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <FormField label="Quantidade">
+                  <Input
+                    inputMode="decimal"
+                    value={editForm.quantity}
+                    onChange={(event) => setEditForm((current) => ({ ...current, quantity: event.target.value }))}
+                  />
+                </FormField>
+                <FormField label="Custo unitario">
+                  <Input
+                    inputMode="decimal"
+                    value={editForm.unitCost}
+                    onChange={(event) => setEditForm((current) => ({ ...current, unitCost: event.target.value }))}
+                  />
+                </FormField>
+              </div>
+            )}
+            {editingItem?.type === "labor" ? (
+              <FormField label="Unidade">
+                <Input
+                  value={editForm.unit}
+                  onChange={(event) => setEditForm((current) => ({ ...current, unit: event.target.value }))}
+                />
+              </FormField>
+            ) : null}
+            {editingItem?.type === "calculated" ? (
+              <FormField label="Justificativa do ajuste">
+                <Textarea
+                  value={editForm.justification}
+                  onChange={(event) => setEditForm((current) => ({ ...current, justification: event.target.value }))}
+                  placeholder="Ex: quantidade confirmada no levantamento revisado."
+                />
+              </FormField>
+            ) : (
+              <FormField label="Observacao">
+                <Textarea
+                  value={editForm.notes}
+                  onChange={(event) => setEditForm((current) => ({ ...current, notes: event.target.value }))}
+                />
+              </FormField>
+            )}
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditingItem(null)}
+                disabled={savingEdit}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={savingEdit}>
+                <Save className="size-4" />
+                {savingEdit ? "Salvando..." : "Salvar alteracao"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={Boolean(archiveTarget)}
+        onOpenChange={(open) => {
+          if (!open && !archiving) {
+            setArchiveTarget(null);
+            setArchiveReason("");
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Arquivar {archiveTarget?.label}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              O item sai do custo atual, mas permanece no banco e na auditoria. Esta acao nao apaga o historico.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <FormField label="Motivo do arquivamento">
+            <Textarea
+              value={archiveReason}
+              onChange={(event) => setArchiveReason(event.target.value)}
+              placeholder="Ex: item substituido por outra especificacao."
+            />
+          </FormField>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={archiving}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => void confirmArchive()}
+              disabled={archiving || archiveReason.trim().length < 3}
+            >
+              <Archive className="size-4" />
+              {archiving ? "Arquivando..." : "Arquivar item"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }
@@ -545,8 +901,68 @@ function CostMetric({ label, value, icon: Icon, accent = false }: { label: strin
   return <Card className={accent ? "border-accent/35 bg-accent/[0.06]" : "border-primary/10"}><CardContent className="flex gap-3 p-4"><span className="flex size-9 items-center justify-center rounded-lg bg-primary/8 text-primary"><Icon className="size-4" /></span><div><p className="text-xs text-muted-foreground">{label}</p><p className="mt-0.5 font-semibold text-foreground">{value}</p></div></CardContent></Card>;
 }
 
-function CostList({ title, emptyLabel, rows }: { title: string; emptyLabel: string; rows: Array<{ id: string; title: string; detail: string; value: string; review?: boolean }> }) {
-  return <div className="space-y-2">{title ? <p className="text-sm font-medium text-foreground">{title}</p> : null}{rows.length ? rows.map((row) => <div key={row.id} className="flex items-center justify-between gap-3 rounded-lg border border-border/70 px-3 py-2.5 text-sm"><div className="min-w-0"><p className="truncate font-medium text-foreground">{row.title}</p><p className="truncate text-xs text-muted-foreground">{row.detail}</p></div><div className="shrink-0 text-right"><p className="font-medium text-foreground">{row.value}</p>{row.review ? <p className="text-[11px] text-amber-700 dark:text-amber-300">Revisao tecnica</p> : null}</div></div>) : <EmptyCosting label={emptyLabel} />}</div>;
+function CostList({
+  title,
+  emptyLabel,
+  rows,
+  readOnly = false,
+}: {
+  title: string;
+  emptyLabel: string;
+  readOnly?: boolean;
+  rows: Array<{
+    id: string;
+    title: string;
+    detail: string;
+    value: string;
+    review?: boolean;
+    onEdit?: () => void;
+    onArchive?: () => void;
+  }>;
+}) {
+  return (
+    <div className="space-y-2">
+      {title ? <p className="text-sm font-medium text-foreground">{title}</p> : null}
+      {rows.length ? rows.map((row) => (
+        <div key={row.id} className="flex items-center gap-3 rounded-lg border border-border/70 px-3 py-2.5 text-sm">
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-medium text-foreground">{row.title}</p>
+            <p className="truncate text-xs text-muted-foreground">{row.detail}</p>
+          </div>
+          <div className="shrink-0 text-right">
+            <p className="font-medium text-foreground">{row.value}</p>
+            {row.review ? <p className="text-[11px] text-amber-700 dark:text-amber-300">Revisao tecnica</p> : null}
+          </div>
+          {!readOnly && row.onEdit && row.onArchive ? (
+            <div className="flex shrink-0 items-center gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-8"
+                onClick={row.onEdit}
+                aria-label={`Editar ${row.title}`}
+                title="Editar item"
+              >
+                <Pencil className="size-3.5" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-8 text-muted-foreground hover:text-destructive"
+                onClick={row.onArchive}
+                aria-label={`Arquivar ${row.title}`}
+                title="Arquivar item"
+              >
+                <Archive className="size-3.5" />
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      )) : <EmptyCosting label={emptyLabel} />}
+    </div>
+  );
 }
 
 function EmptyCosting({ label }: { label: string }) {

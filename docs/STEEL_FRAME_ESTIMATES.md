@@ -7,6 +7,7 @@ O modulo tem uma fundacao segura e auditavel e uma interface operacional que com
 - lista de orcamentos, criacao a partir de um lead ou manual e ficha de geometria;
 - catalogo de materiais com preco inicial cadastrado por permissao;
 - itens calculados pelo motor tipado com regra aprovada, explicacao e plano de corte, mantendo o calculo manual como contingencia;
+- edicao e arquivamento auditavel de materiais, mao de obra e custos operacionais, sem exclusao do historico;
 - custo direto, preco minimo, preco recomendado e desconto maximo derivados somente dos dados salvos;
 - upload privado de plantas, croquis, fotos e PDFs, com URL assinada curta para abertura;
 - analise documental pelo Gemini, com rascunho editavel, confianca/evidencia por item, modo de revisar somente pendencias, vinculo de abertura a parede e correcao humana auditada;
@@ -32,6 +33,7 @@ Antes de aplicar, mantenha a ordem abaixo no SQL Editor ou no Supabase CLI:
 10. `supabase/migrations/add_steel_frame_technical_rules.sql`
 11. `supabase/migrations/20260801000000_steel_frame_phase_2_catalog_foundation.sql`
 12. `supabase/migrations/20260802000000_steel_frame_supplier_quote_history.sql`
+13. `supabase/migrations/20260803000000_steel_frame_cost_item_lifecycle.sql`
 
 A migration e aditiva e idempotente. Ela nao apaga leads, perfis, tarefas, interacoes ou arquivos existentes. Em especial, a relacao de um orcamento com um lead usa `ON DELETE SET NULL`, preservando o historico de precificacao caso um lead seja removido depois.
 
@@ -55,6 +57,8 @@ Todas as tabelas novas usam RLS. O acesso e determinado por `auth.uid()` e pelas
 - Parceiros nao recebem permissao padrao para ver orcamentos ou financeiros. Um administrador pode conceder `estimates.view_assigned` de forma individual quando o acesso for realmente necessario; custos, margem e precos continuam protegidos por `estimates.financials.view`.
 
 Versoes aprovadas ou congeladas nao podem ser alteradas. Alteracoes em rascunhos de orcamento e versao entram em `steel_frame_audit_logs`.
+
+Itens de custo de uma versao editavel podem ser corrigidos ou arquivados. O arquivamento exige motivo, registra autor e data, remove o item somente do custo ativo e preserva a linha original para auditoria. Ajustes manuais em materiais preservam o calculo anterior em `source_data`, exigem justificativa e retornam o item para confirmacao tecnica.
 
 Uma unica excecao controlada e o PDF de proposta: ele so pode ser anexado como documento `proposal` com visibilidade `internal`, pela propria conta que possui permissoes de financeiros e de geracao de proposta. O arquivo continua no bucket privado, fica associado a versao tecnica corrente e a mudanca para `proposal_generated` ocorre pela RPC `mark_steel_frame_proposal_generated`, que tambem registra auditoria. Parceiros sem permissao financeira nao conseguem listar, abrir ou baixar esse PDF.
 
@@ -114,6 +118,6 @@ O resultado e validado por Zod, armazenado como uma extracao pendente de confirm
 
 ## Proximas fases
 
-1. Edicao/arquivamento de itens de custo, fornecedores, precos historicos, composicoes e reforcos.
+1. Edicao/arquivamento de fornecedores, precos historicos, composicoes e reforcos.
 2. Criacao guiada de uma nova versao quando uma proposta congelada precisar de revisao.
 3. Sincronizacao offline de rascunhos e testes ponta a ponta autenticados.

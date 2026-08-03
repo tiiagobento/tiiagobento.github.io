@@ -30,7 +30,9 @@ import {
   steelFrameDocumentsBucket,
 } from "./documents";
 import {
+  steelFrameCalculatedItemAdjustmentSchema,
   steelFrameCalculatedItemSchema,
+  steelFrameCostItemArchiveSchema,
   steelFrameLaborItemSchema,
   steelFrameOperationalCostSchema,
   steelFrameTechnicalCompositionDraftSchema,
@@ -467,16 +469,19 @@ export async function getSteelFrameCosting(estimateId: string): Promise<SteelFra
       .from("steel_frame_calculated_items")
       .select("*")
       .eq("estimate_id", estimateId)
+      .is("archived_at", null)
       .order("sort_order", { ascending: true }),
     client
       .from("steel_frame_labor_items")
       .select("*")
       .eq("estimate_id", estimateId)
+      .is("archived_at", null)
       .order("sort_order", { ascending: true }),
     client
       .from("steel_frame_operational_costs")
       .select("*")
       .eq("estimate_id", estimateId)
+      .is("archived_at", null)
       .order("sort_order", { ascending: true }),
     client
       .from("steel_frame_commercial_components")
@@ -582,6 +587,139 @@ export async function addSteelFrameOperationalCost(
 
   if (error) throw new Error(getSteelFrameErrorMessage(error));
   return data as SteelFrameOperationalCostRecord;
+}
+
+export async function adjustSteelFrameCalculatedItem(
+  item: SteelFrameCalculatedItemRecord,
+  input: {
+    label: string;
+    calculatedQuantity: number;
+    unitCost: number;
+    justification: string;
+  },
+) {
+  const parsed = steelFrameCalculatedItemAdjustmentSchema.parse(input);
+  const client = getClient();
+  const previousRule = {
+    calculationRule: item.calculation_rule,
+    ruleParameters: item.rule_parameters,
+    rawQuantity: Number(item.raw_quantity),
+    wastePercent: Number(item.waste_percent),
+    calculatedQuantity: Number(item.calculated_quantity),
+    unitCost: Number(item.unit_cost),
+  };
+  const { data, error } = await client
+    .from("steel_frame_calculated_items")
+    .update({
+      label: parsed.label,
+      calculation_rule: "MANUAL",
+      rule_parameters: { adjustment_justification: parsed.justification },
+      raw_quantity: parsed.calculatedQuantity,
+      waste_percent: 0,
+      calculated_quantity: parsed.calculatedQuantity,
+      unit_cost: parsed.unitCost,
+      requires_technical_review: true,
+      confirmation_status: "needs_confirmation",
+      source_data: {
+        ...item.source_data,
+        latest_manual_adjustment: {
+          justification: parsed.justification,
+          previous: previousRule,
+          adjusted_at: new Date().toISOString(),
+        },
+      },
+    })
+    .eq("id", item.id)
+    .eq("estimate_id", item.estimate_id)
+    .is("archived_at", null)
+    .select("*")
+    .single();
+
+  if (error) throw new Error(getSteelFrameErrorMessage(error));
+  return data as SteelFrameCalculatedItemRecord;
+}
+
+export async function updateSteelFrameLaborItem(
+  item: SteelFrameLaborItemRecord,
+  input: SteelFrameLaborItemInput,
+) {
+  const parsed = steelFrameLaborItemSchema.parse(input);
+  const client = getClient();
+  const { data, error } = await client
+    .from("steel_frame_labor_items")
+    .update({
+      label: parsed.label,
+      quantity: parsed.quantity,
+      unit: parsed.unit,
+      unit_cost: parsed.unitCost,
+      notes: toNullableString(parsed.notes),
+    })
+    .eq("id", item.id)
+    .eq("estimate_id", item.estimate_id)
+    .is("archived_at", null)
+    .select("*")
+    .single();
+
+  if (error) throw new Error(getSteelFrameErrorMessage(error));
+  return data as SteelFrameLaborItemRecord;
+}
+
+export async function updateSteelFrameOperationalCost(
+  item: SteelFrameOperationalCostRecord,
+  input: SteelFrameOperationalCostInput,
+) {
+  const parsed = steelFrameOperationalCostSchema.parse(input);
+  const client = getClient();
+  const { data, error } = await client
+    .from("steel_frame_operational_costs")
+    .update({
+      category: parsed.category,
+      label: parsed.label,
+      amount: parsed.amount,
+      notes: toNullableString(parsed.notes),
+    })
+    .eq("id", item.id)
+    .eq("estimate_id", item.estimate_id)
+    .is("archived_at", null)
+    .select("*")
+    .single();
+
+  if (error) throw new Error(getSteelFrameErrorMessage(error));
+  return data as SteelFrameOperationalCostRecord;
+}
+
+export async function archiveSteelFrameCostItem(input: {
+  estimateId: string;
+  itemId: string;
+  itemType: "calculated" | "labor" | "operational";
+  reason: string;
+}) {
+  const parsed = steelFrameCostItemArchiveSchema.parse(input);
+  const client = getClient();
+  const { data: authData, error: authError } = await client.auth.getUser();
+  if (authError || !authData.user) {
+    throw new Error("Sua sessao expirou. Entre novamente para arquivar este item.");
+  }
+
+  const tableByType = {
+    calculated: "steel_frame_calculated_items",
+    labor: "steel_frame_labor_items",
+    operational: "steel_frame_operational_costs",
+  } as const;
+  const { error } = await client
+    .from(tableByType[parsed.itemType])
+    .update({
+      archived_at: new Date().toISOString(),
+      archived_by: authData.user.id,
+      archive_reason: parsed.reason,
+    })
+    .eq("id", parsed.itemId)
+    .eq("estimate_id", parsed.estimateId)
+    .is("archived_at", null)
+    .select("id")
+    .single();
+
+  if (error) throw new Error(getSteelFrameErrorMessage(error));
 }
 
 export async function upsertSteelFrameCommercialComponents(

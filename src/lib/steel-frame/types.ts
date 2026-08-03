@@ -258,6 +258,9 @@ export type SteelFrameCalculatedItemRecord = {
   confirmation_status: SteelFrameConfirmationStatus;
   source_data: Record<string, unknown>;
   sort_order: number;
+  archived_at: string | null;
+  archived_by: string | null;
+  archive_reason: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -273,6 +276,9 @@ export type SteelFrameLaborItemRecord = {
   total_cost: number;
   notes: string | null;
   sort_order: number;
+  archived_at: string | null;
+  archived_by: string | null;
+  archive_reason: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -286,6 +292,9 @@ export type SteelFrameOperationalCostRecord = {
   amount: number;
   notes: string | null;
   sort_order: number;
+  archived_at: string | null;
+  archived_by: string | null;
+  archive_reason: string | null;
   created_at: string;
   updated_at: string;
 };

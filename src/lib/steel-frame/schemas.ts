@@ -186,6 +186,28 @@ export const steelFrameOperationalCostSchema = z.object({
   notes: z.string().trim().max(1000).nullable().optional(),
 });
 
+export const steelFrameCalculatedItemAdjustmentSchema = z.object({
+  label: z.string().trim().min(1, "Informe o material.").max(160),
+  calculatedQuantity: nonNegativeNumber.max(100000000),
+  unitCost: nonNegativeNumber.max(100000000),
+  justification: z
+    .string()
+    .trim()
+    .min(3, "Explique por que o item foi ajustado.")
+    .max(1000),
+});
+
+export const steelFrameCostItemArchiveSchema = z.object({
+  estimateId: z.string().uuid(),
+  itemId: z.string().uuid(),
+  itemType: z.enum(["calculated", "labor", "operational"]),
+  reason: z
+    .string()
+    .trim()
+    .min(3, "Informe o motivo do arquivamento.")
+    .max(1000),
+});
+
 export const steelFrameEstimateVersionSchema = z.object({
   estimateId: z.string().uuid(),
   versionNumber: z.number().int().min(1),

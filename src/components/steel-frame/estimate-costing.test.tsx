@@ -1,21 +1,29 @@
 // @vitest-environment jsdom
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EstimateCosting } from "./estimate-costing";
 
 const dataMocks = vi.hoisted(() => ({
+  adjustSteelFrameCalculatedItem: vi.fn(),
+  archiveSteelFrameCostItem: vi.fn(),
   getSteelFrameCosting: vi.fn(),
   listSteelFrameMaterials: vi.fn(),
+  updateSteelFrameLaborItem: vi.fn(),
+  updateSteelFrameOperationalCost: vi.fn(),
 }));
 
 vi.mock("@/lib/steel-frame/data", () => ({
+  adjustSteelFrameCalculatedItem: dataMocks.adjustSteelFrameCalculatedItem,
   addSteelFrameCalculatedItem: vi.fn(),
   addSteelFrameLaborItem: vi.fn(),
   addSteelFrameOperationalCost: vi.fn(),
+  archiveSteelFrameCostItem: dataMocks.archiveSteelFrameCostItem,
   getSteelFrameCosting: dataMocks.getSteelFrameCosting,
   getSteelFrameErrorMessage: (error: unknown) => error instanceof Error ? error.message : "Erro ao carregar.",
   listSteelFrameMaterials: dataMocks.listSteelFrameMaterials,
+  updateSteelFrameLaborItem: dataMocks.updateSteelFrameLaborItem,
+  updateSteelFrameOperationalCost: dataMocks.updateSteelFrameOperationalCost,
   upsertSteelFrameCommercialComponents: vi.fn(),
 }));
 
@@ -74,5 +82,76 @@ describe("EstimateCosting", () => {
     expect(screen.getByRole("button", { name: "Adicionar mao de obra" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Adicionar custo" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Salvar composicao" })).toBeDisabled();
+  });
+
+  it("edits labor and refreshes the saved total", async () => {
+    dataMocks.listSteelFrameMaterials.mockResolvedValue([]);
+    const laborItem = {
+      id: "labor-1",
+      estimate_id: "estimate-1",
+      label: "Montagem",
+      quantity: 1,
+      unit: "diaria",
+      unit_cost: 300,
+      total_cost: 300,
+      notes: null,
+    };
+    dataMocks.getSteelFrameCosting.mockResolvedValue({
+      ...emptySnapshot,
+      laborItems: [laborItem],
+    });
+    dataMocks.updateSteelFrameLaborItem.mockResolvedValue({
+      ...laborItem,
+      quantity: 2,
+      total_cost: 600,
+    });
+
+    render(<EstimateCosting estimateId="estimate-1" walls={[]} openings={[]} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Editar Montagem" }));
+    fireEvent.change(screen.getByDisplayValue("1"), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar alteracao" }));
+
+    await waitFor(() => expect(dataMocks.updateSteelFrameLaborItem).toHaveBeenCalledWith(
+      laborItem,
+      expect.objectContaining({ quantity: 2 }),
+    ));
+    expect((await screen.findAllByText("R$ 600,00")).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("archives an item with a reason instead of deleting its history", async () => {
+    dataMocks.listSteelFrameMaterials.mockResolvedValue([]);
+    const materialItem = {
+      id: "item-1",
+      estimate_id: "estimate-1",
+      label: "Placa cimenticia",
+      calculated_quantity: 2,
+      unit: "un",
+      calculation_rule: "MANUAL",
+      unit_cost: 99.9,
+      total_cost: 199.8,
+      requires_technical_review: true,
+    };
+    dataMocks.getSteelFrameCosting.mockResolvedValue({
+      ...emptySnapshot,
+      calculatedItems: [materialItem],
+    });
+    dataMocks.archiveSteelFrameCostItem.mockResolvedValue(undefined);
+
+    render(<EstimateCosting estimateId="estimate-1" walls={[]} openings={[]} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Arquivar Placa cimenticia" }));
+    fireEvent.change(screen.getByPlaceholderText("Ex: item substituido por outra especificacao."), {
+      target: { value: "Material substituido na revisao" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Arquivar item" }));
+
+    await waitFor(() => expect(dataMocks.archiveSteelFrameCostItem).toHaveBeenCalledWith({
+      estimateId: "estimate-1",
+      itemId: "item-1",
+      itemType: "calculated",
+      reason: "Material substituido na revisao",
+    }));
+    await waitFor(() => expect(screen.queryByText("Placa cimenticia")).not.toBeInTheDocument());
   });
 });

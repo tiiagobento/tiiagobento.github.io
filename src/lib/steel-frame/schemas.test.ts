@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   steelFrameAIExtractionSchema,
+  steelFrameCalculatedItemAdjustmentSchema,
   steelFrameCalculationRuleSchema,
   steelFrameCommercialComponentsSchema,
+  steelFrameCostItemArchiveSchema,
   steelFrameEstimateDraftSchema,
   steelFrameTechnicalCompositionDraftSchema,
   steelFrameTechnicalRuleDraftSchema,
@@ -102,6 +104,28 @@ describe("steel frame schemas", () => {
       referenceName: "Memorial interno",
       referenceVersion: "rascunho",
       sourceDocumentId: "f046f2ea-5eeb-4389-9e62-3c99b2089d5e",
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("requires a justification when a calculated cost is manually adjusted", () => {
+    const result = steelFrameCalculatedItemAdjustmentSchema.safeParse({
+      label: "Montante 90 mm",
+      calculatedQuantity: 42,
+      unitCost: 31.5,
+      justification: "",
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("requires an auditable reason before archiving a cost item", () => {
+    const result = steelFrameCostItemArchiveSchema.safeParse({
+      estimateId: "f046f2ea-5eeb-4389-9e62-3c99b2089d5e",
+      itemId: "9c80781c-8138-4330-a6d0-6796325a52d0",
+      itemType: "labor",
+      reason: " ",
     });
 
     expect(result.success).toBe(false);
