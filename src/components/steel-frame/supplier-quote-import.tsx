@@ -28,11 +28,14 @@ import {
   createSupabaseSteelFrameCatalogRepository,
   steelFrameSupplierQuoteAnalysisSchema,
   steelFrameSupplierQuoteDraftSchema,
+  suggestSupplierQuoteMaterial,
   type SteelFrameCatalogTechnicalSource,
   type SteelFrameSupplierQuoteAnalysis,
+  type SteelFrameSupplierQuoteMaterialSuggestion,
   type SteelFrameSupplierQuoteRecord,
 } from "@/lib/steel-frame/catalog";
-import { getSteelFrameErrorMessage } from "@/lib/steel-frame/data";
+import { getSteelFrameErrorMessage, listSteelFrameMaterials } from "@/lib/steel-frame/data";
+import type { SteelFrameMaterialRecord } from "@/lib/steel-frame/types";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type ReviewItem = {
@@ -45,7 +48,12 @@ type ReviewItem = {
   unit: string;
   unitPrice: string;
   lineTotal: string;
+  materialId: string;
+  matchingStatus: "unmatched" | "confirmed" | "not_applicable";
+  suggestion: SteelFrameSupplierQuoteMaterialSuggestion | null;
 };
+
+type EditableReviewItemField = Exclude<keyof ReviewItem, "matchingStatus" | "suggestion">;
 
 type QuoteForm = {
   supplierName: string;
@@ -108,21 +116,30 @@ function formatCurrency(value: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 }
 
-function makeReviewItem(index: number, item?: SteelFrameSupplierQuoteAnalysis["items"][number]): ReviewItem {
+function makeReviewItem(
+  index: number,
+  materials: SteelFrameMaterialRecord[],
+  item?: SteelFrameSupplierQuoteAnalysis["items"][number],
+): ReviewItem {
+  const externalCode = textOrEmpty(item?.external_code ?? null);
+  const description = item?.description ?? "";
   return {
     id: `quote-item-${crypto.randomUUID()}`,
     sourceLineNumber: String(item?.source_line_number ?? index + 1),
-    externalCode: textOrEmpty(item?.external_code ?? null),
-    description: item?.description ?? "",
+    externalCode,
+    description,
     ncm: textOrEmpty(item?.ncm ?? null),
     quantity: decimalOrEmpty(item?.quantity ?? null),
     unit: textOrEmpty(item?.unit ?? null),
     unitPrice: decimalOrEmpty(item?.unit_price ?? null),
     lineTotal: decimalOrEmpty(item?.line_total ?? null),
+    materialId: "",
+    matchingStatus: "unmatched",
+    suggestion: item ? suggestSupplierQuoteMaterial({ externalCode, description }, materials) : null,
   };
 }
 
-function makeReviewState(analysis: SteelFrameSupplierQuoteAnalysis) {
+function makeReviewState(analysis: SteelFrameSupplierQuoteAnalysis, materials: SteelFrameMaterialRecord[]) {
   const warnings = analysis.warnings.length ? `\n\nAlertas da analise: ${analysis.warnings.join(" ")}` : "";
   return {
     form: {
@@ -143,7 +160,7 @@ function makeReviewState(analysis: SteelFrameSupplierQuoteAnalysis) {
       total: decimalOrEmpty(analysis.quote.total),
       notes: `${analysis.summary}${warnings}`,
     },
-    items: analysis.items.map((item, index) => makeReviewItem(index, item)),
+    items: analysis.items.map((item, index) => makeReviewItem(index, materials, item)),
   };
 }
 
@@ -153,6 +170,7 @@ export function SupplierQuoteImport() {
   const repository = React.useMemo(() => createSupabaseSteelFrameCatalogRepository(client), [client]);
   const [sources, setSources] = React.useState<SteelFrameCatalogTechnicalSource[]>([]);
   const [quotes, setQuotes] = React.useState<SteelFrameSupplierQuoteRecord[]>([]);
+  const [materials, setMaterials] = React.useState<SteelFrameMaterialRecord[]>([]);
   const [selectedSourceId, setSelectedSourceId] = React.useState("");
   const [selectedDocumentId, setSelectedDocumentId] = React.useState("");
   const [context, setContext] = React.useState("");
@@ -175,12 +193,14 @@ export function SupplierQuoteImport() {
     setLoading(true);
     setError(null);
     try {
-      const [loadedSources, loadedQuotes] = await Promise.all([
+      const [loadedSources, loadedQuotes, loadedMaterials] = await Promise.all([
         repository.listTechnicalSources(),
         repository.listSupplierQuotes(),
+        listSteelFrameMaterials(),
       ]);
       setSources(loadedSources);
       setQuotes(loadedQuotes);
+      setMaterials(loadedMaterials);
     } catch (loadError) {
       setError(getSteelFrameErrorMessage(loadError));
     } finally {
@@ -231,7 +251,7 @@ export function SupplierQuoteImport() {
       if (!parsed?.success) throw new Error("A IA retornou uma cotacao incompleta ou invalida. Revise o documento e tente novamente.");
 
       setAnalysis(parsed.data);
-      const review = makeReviewState(parsed.data);
+      const review = makeReviewState(parsed.data, materials);
       setForm(review.form);
       setItems(review.items);
       toast.success("Rascunho da cotacao pronto para revisao.");
@@ -246,12 +266,36 @@ export function SupplierQuoteImport() {
     setForm((current) => ({ ...current, [field]: value }));
   }
 
-  function updateItem(id: string, field: keyof ReviewItem, value: string) {
-    setItems((current) => current.map((item) => item.id === id ? { ...item, [field]: value } : item));
+  function updateItem(id: string, field: EditableReviewItemField, value: string) {
+    setItems((current) => current.map((item) => {
+      if (item.id !== id) return item;
+      if (field === "materialId") {
+        if (value === "not_applicable") return { ...item, materialId: "", matchingStatus: "not_applicable" };
+        if (value === "unmatched") return { ...item, materialId: "", matchingStatus: "unmatched" };
+        return { ...item, materialId: value, matchingStatus: "confirmed" };
+      }
+      const next = { ...item, [field]: value };
+      if (field === "externalCode" || field === "description") {
+        return {
+          ...next,
+          suggestion: suggestSupplierQuoteMaterial({
+            externalCode: next.externalCode,
+            description: next.description,
+          }, materials),
+        };
+      }
+      return next;
+    }));
+  }
+
+  function confirmSuggestion(id: string) {
+    setItems((current) => current.map((item) => item.id === id && item.suggestion
+      ? { ...item, materialId: item.suggestion.materialId, matchingStatus: "confirmed" }
+      : item));
   }
 
   function addItem() {
-    setItems((current) => [...current, makeReviewItem(current.length)]);
+    setItems((current) => [...current, makeReviewItem(current.length, materials)]);
   }
 
   async function saveQuote() {
@@ -290,9 +334,9 @@ export function SupplierQuoteImport() {
         unit: item.unit,
         unitPrice: parseDecimal(item.unitPrice),
         lineTotal: parseDecimal(item.lineTotal),
-        materialId: null,
+        materialId: item.materialId || null,
         materialVariantId: null,
-        matchingStatus: "unmatched",
+        matchingStatus: item.matchingStatus,
       })),
     });
 
@@ -371,7 +415,7 @@ export function SupplierQuoteImport() {
         </Card>
       )}
 
-      {analysis ? <QuoteReview form={form} items={items} analysis={analysis} saving={saving} onFormChange={updateForm} onItemChange={updateItem} onAddItem={addItem} onRemoveItem={(id) => setItems((current) => current.filter((item) => item.id !== id))} onSave={() => void saveQuote()} /> : null}
+      {analysis ? <QuoteReview form={form} items={items} materials={materials} analysis={analysis} saving={saving} onFormChange={updateForm} onItemChange={updateItem} onConfirmSuggestion={confirmSuggestion} onAddItem={addItem} onRemoveItem={(id) => setItems((current) => current.filter((item) => item.id !== id))} onSave={() => void saveQuote()} /> : null}
 
       <SupplierQuoteHistory quotes={quotes} />
     </div>
@@ -381,20 +425,24 @@ export function SupplierQuoteImport() {
 function QuoteReview({
   form,
   items,
+  materials,
   analysis,
   saving,
   onFormChange,
   onItemChange,
+  onConfirmSuggestion,
   onAddItem,
   onRemoveItem,
   onSave,
 }: {
   form: QuoteForm;
   items: ReviewItem[];
+  materials: SteelFrameMaterialRecord[];
   analysis: SteelFrameSupplierQuoteAnalysis;
   saving: boolean;
   onFormChange: (field: keyof QuoteForm, value: string) => void;
-  onItemChange: (id: string, field: keyof ReviewItem, value: string) => void;
+  onItemChange: (id: string, field: EditableReviewItemField, value: string) => void;
+  onConfirmSuggestion: (id: string) => void;
   onAddItem: () => void;
   onRemoveItem: (id: string) => void;
   onSave: () => void;
@@ -406,7 +454,7 @@ function QuoteReview({
         {analysis.warnings.length ? <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.05] p-4"><p className="mb-2 text-sm font-medium text-foreground">Pontos para conferir</p><ul className="space-y-1 text-sm text-muted-foreground">{analysis.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></div> : null}
         <section className="space-y-3"><p className="text-sm font-medium text-foreground">Fornecedor e cotacao</p><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3"><Field label="Fornecedor"><Input value={form.supplierName} onChange={(event) => onFormChange("supplierName", event.target.value)} /></Field><Field label="CNPJ / identificador"><Input value={form.supplierTaxId} onChange={(event) => onFormChange("supplierTaxId", event.target.value)} /></Field><Field label="Numero da cotacao"><Input value={form.quoteNumber} onChange={(event) => onFormChange("quoteNumber", event.target.value)} /></Field><Field label="Contato"><Input value={form.supplierContactName} onChange={(event) => onFormChange("supplierContactName", event.target.value)} /></Field><Field label="Telefone comercial"><Input value={form.supplierContactPhone} onChange={(event) => onFormChange("supplierContactPhone", event.target.value)} /></Field><Field label="Email comercial"><Input type="email" value={form.supplierContactEmail} onChange={(event) => onFormChange("supplierContactEmail", event.target.value)} /></Field><Field label="Data da cotacao"><Input type="date" value={form.issuedOn} onChange={(event) => onFormChange("issuedOn", event.target.value)} /></Field><Field label="Validade"><Input type="date" value={form.validUntil} onChange={(event) => onFormChange("validUntil", event.target.value)} /></Field><Field label="Previsao de faturamento"><Input type="date" value={form.expectedBillingOn} onChange={(event) => onFormChange("expectedBillingOn", event.target.value)} /></Field></div></section>
         <section className="space-y-3"><p className="text-sm font-medium text-foreground">Valores e condicoes</p><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5"><Field label="Subtotal"><Input inputMode="decimal" value={form.subtotal} onChange={(event) => onFormChange("subtotal", event.target.value)} placeholder="0,00" /></Field><Field label="Desconto"><Input inputMode="decimal" value={form.discount} onChange={(event) => onFormChange("discount", event.target.value)} placeholder="0,00" /></Field><Field label="Frete"><Input inputMode="decimal" value={form.freight} onChange={(event) => onFormChange("freight", event.target.value)} placeholder="0,00" /></Field><Field label="Impostos"><Input inputMode="decimal" value={form.taxes} onChange={(event) => onFormChange("taxes", event.target.value)} placeholder="0,00" /></Field><Field label="Total"><Input required inputMode="decimal" value={form.total} onChange={(event) => onFormChange("total", event.target.value)} placeholder="0,00" /></Field></div><Field label="Condicoes de pagamento"><Input value={form.paymentTerms} onChange={(event) => onFormChange("paymentTerms", event.target.value)} placeholder="Ex: A vista" /></Field></section>
-        <section className="space-y-3"><div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm font-medium text-foreground">Itens revisados</p><Button type="button" size="sm" variant="outline" onClick={onAddItem}><Plus className="size-4" /> Adicionar item</Button></div>{items.length ? <div className="space-y-3">{items.map((item, index) => <QuoteItemEditor key={item.id} item={item} index={index} canRemove={items.length > 1} onChange={onItemChange} onRemove={onRemoveItem} />)}</div> : <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">A IA nao encontrou itens completos. Adicione-os manualmente antes de registrar a cotacao.</div>}</section>
+        <section className="space-y-3"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-medium text-foreground">Itens revisados</p><p className="mt-1 text-xs text-muted-foreground">Sugestoes nao sao confirmadas automaticamente. Vincule somente quando o produto comercial corresponder ao material interno.</p></div><Button type="button" size="sm" variant="outline" onClick={onAddItem}><Plus className="size-4" /> Adicionar item</Button></div>{items.length ? <div className="space-y-3">{items.map((item, index) => <QuoteItemEditor key={item.id} item={item} materials={materials} index={index} canRemove={items.length > 1} onChange={onItemChange} onConfirmSuggestion={onConfirmSuggestion} onRemove={onRemoveItem} />)}</div> : <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">A IA nao encontrou itens completos. Adicione-os manualmente antes de registrar a cotacao.</div>}</section>
         <Field label="Resumo e observacoes"><Textarea className="min-h-28" value={form.notes} onChange={(event) => onFormChange("notes", event.target.value)} /></Field>
         <div className="flex flex-col gap-3 rounded-xl border bg-secondary/25 p-4 sm:flex-row sm:items-center sm:justify-between"><p className="max-w-2xl text-sm text-muted-foreground">Salvar registra um snapshot comercial historico. A associacao com materiais e a publicacao de preco permanecem manuais e auditaveis.</p><Button type="button" onClick={onSave} disabled={saving || !items.length}>{saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}{saving ? "Registrando..." : "Registrar cotacao revisada"}</Button></div>
       </CardContent>
@@ -414,12 +462,14 @@ function QuoteReview({
   );
 }
 
-function QuoteItemEditor({ item, index, canRemove, onChange, onRemove }: { item: ReviewItem; index: number; canRemove: boolean; onChange: (id: string, field: keyof ReviewItem, value: string) => void; onRemove: (id: string) => void }) {
-  return <div className="grid gap-3 rounded-xl border bg-card p-3 md:grid-cols-2 xl:grid-cols-[0.42fr_0.72fr_2fr_0.7fr_0.7fr_0.7fr_0.85fr_auto]"><Field label={`Linha ${index + 1}`}><Input inputMode="numeric" value={item.sourceLineNumber} onChange={(event) => onChange(item.id, "sourceLineNumber", event.target.value)} /></Field><Field label="Codigo"><Input value={item.externalCode} onChange={(event) => onChange(item.id, "externalCode", event.target.value)} /></Field><Field label="Descricao"><Input value={item.description} onChange={(event) => onChange(item.id, "description", event.target.value)} /></Field><Field label="Qtd."><Input inputMode="decimal" value={item.quantity} onChange={(event) => onChange(item.id, "quantity", event.target.value)} /></Field><Field label="Unidade"><Input value={item.unit} onChange={(event) => onChange(item.id, "unit", event.target.value)} /></Field><Field label="Unitario"><Input inputMode="decimal" value={item.unitPrice} onChange={(event) => onChange(item.id, "unitPrice", event.target.value)} /></Field><Field label="Total"><Input inputMode="decimal" value={item.lineTotal} onChange={(event) => onChange(item.id, "lineTotal", event.target.value)} /></Field><div className="flex items-end">{canRemove ? <Button type="button" size="icon" variant="ghost" aria-label={`Remover item ${index + 1}`} onClick={() => onRemove(item.id)}><Trash2 className="size-4 text-destructive" /></Button> : null}</div></div>;
+function QuoteItemEditor({ item, materials, index, canRemove, onChange, onConfirmSuggestion, onRemove }: { item: ReviewItem; materials: SteelFrameMaterialRecord[]; index: number; canRemove: boolean; onChange: (id: string, field: EditableReviewItemField, value: string) => void; onConfirmSuggestion: (id: string) => void; onRemove: (id: string) => void }) {
+  const suggestedMaterial = item.suggestion ? materials.find((material) => material.id === item.suggestion?.materialId) ?? null : null;
+  const matchValue = item.matchingStatus === "not_applicable" ? "not_applicable" : item.materialId || "unmatched";
+  return <div className="space-y-3 rounded-xl border bg-card p-3"><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[0.42fr_0.72fr_2fr_0.7fr_0.7fr_0.7fr_0.85fr_auto]"><Field label={`Linha ${index + 1}`}><Input inputMode="numeric" value={item.sourceLineNumber} onChange={(event) => onChange(item.id, "sourceLineNumber", event.target.value)} /></Field><Field label="Codigo"><Input value={item.externalCode} onChange={(event) => onChange(item.id, "externalCode", event.target.value)} /></Field><Field label="Descricao"><Input value={item.description} onChange={(event) => onChange(item.id, "description", event.target.value)} /></Field><Field label="Qtd."><Input inputMode="decimal" value={item.quantity} onChange={(event) => onChange(item.id, "quantity", event.target.value)} /></Field><Field label="Unidade"><Input value={item.unit} onChange={(event) => onChange(item.id, "unit", event.target.value)} /></Field><Field label="Unitario"><Input inputMode="decimal" value={item.unitPrice} onChange={(event) => onChange(item.id, "unitPrice", event.target.value)} /></Field><Field label="Total"><Input inputMode="decimal" value={item.lineTotal} onChange={(event) => onChange(item.id, "lineTotal", event.target.value)} /></Field><div className="flex items-end">{canRemove ? <Button type="button" size="icon" variant="ghost" aria-label={`Remover item ${index + 1}`} onClick={() => onRemove(item.id)}><Trash2 className="size-4 text-destructive" /></Button> : null}</div></div><div className="grid gap-3 border-t border-border/70 pt-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] lg:items-end"><Field label="Material do catalogo"><Select value={matchValue} onValueChange={(value) => onChange(item.id, "materialId", value)}><SelectTrigger aria-label={`Material do catalogo do item ${index + 1}`}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="unmatched">Ainda nao vinculado</SelectItem><SelectItem value="not_applicable">Nao se aplica ao catalogo</SelectItem>{materials.map((material) => <SelectItem key={material.id} value={material.id}>{material.name}{material.sku ? ` - ${material.sku}` : ""}</SelectItem>)}</SelectContent></Select></Field><div className="min-w-0">{item.matchingStatus === "confirmed" ? <div className="flex min-h-10 items-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/[0.06] px-3 text-sm"><Badge variant="secondary">Confirmado</Badge><span className="truncate text-muted-foreground">Vinculo revisado pelo administrador.</span></div> : item.matchingStatus === "unmatched" && suggestedMaterial && item.suggestion ? <div className="flex flex-col gap-2 rounded-lg border border-amber-500/25 bg-amber-500/[0.05] p-3 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><Badge variant="outline">Sugestao {item.suggestion.confidence === "high" ? "alta" : "media"}</Badge><span className="truncate text-sm font-medium">{suggestedMaterial.name}</span></div><p className="mt-1 text-xs text-muted-foreground">{item.suggestion.reason}</p></div><Button type="button" size="sm" variant="outline" onClick={() => onConfirmSuggestion(item.id)}>Confirmar sugestao</Button></div> : <div className="flex min-h-10 items-center rounded-lg border border-dashed px-3 text-xs text-muted-foreground">{item.matchingStatus === "not_applicable" ? "Item marcado como nao aplicavel ao catalogo." : "Nenhuma correspondencia segura. Revise manualmente."}</div>}</div></div></div>;
 }
 
 function SupplierQuoteHistory({ quotes }: { quotes: SteelFrameSupplierQuoteRecord[] }) {
-  return <section className="space-y-3"><div className="flex items-center gap-2"><History className="size-4 text-primary" /><h2 className="text-base font-semibold">Historico de cotacoes</h2></div>{quotes.length ? <div className="grid gap-3 xl:grid-cols-2">{quotes.map((quote) => <Card key={quote.id} className="border-primary/10"><CardContent className="space-y-3 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold">{quote.supplierName}</p><p className="mt-1 text-sm text-muted-foreground">{quote.quoteNumber ? `Cotacao ${quote.quoteNumber}` : "Numero a confirmar"} - {quote.sourceDocumentName || quote.sourceTitle || "Documento privado"}</p></div><Badge variant="secondary">Historica</Badge></div><div className="grid grid-cols-2 gap-2 border-y border-border/70 py-3 text-sm"><p><span className="text-muted-foreground">Itens:</span> {quote.items.length}</p><p><span className="text-muted-foreground">Total:</span> {formatCurrency(quote.total)}</p><p><span className="text-muted-foreground">Emitida:</span> {quote.issuedOn || "A confirmar"}</p><p><span className="text-muted-foreground">Validade:</span> {quote.validUntil || "A confirmar"}</p></div><p className="text-xs text-muted-foreground">Valores permanecem historicos ate uma selecao manual de preco no catalogo.</p></CardContent></Card>)}</div> : <Card className="border-dashed border-primary/20"><CardContent className="flex min-h-36 flex-col items-center justify-center p-5 text-center"><History className="mb-2 size-6 text-accent" /><p className="font-medium">Nenhuma cotacao historica</p><p className="mt-1 text-sm text-muted-foreground">As cotacoes revisadas aparecerao aqui, preservando o arquivo privado que as fundamenta.</p></CardContent></Card>}</section>;
+  return <section className="space-y-3"><div className="flex items-center gap-2"><History className="size-4 text-primary" /><h2 className="text-base font-semibold">Historico de cotacoes</h2></div>{quotes.length ? <div className="grid gap-3 xl:grid-cols-2">{quotes.map((quote) => { const linkedItems = quote.items.filter((item) => item.matchingStatus === "confirmed").length; return <Card key={quote.id} className="border-primary/10"><CardContent className="space-y-3 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold">{quote.supplierName}</p><p className="mt-1 text-sm text-muted-foreground">{quote.quoteNumber ? `Cotacao ${quote.quoteNumber}` : "Numero a confirmar"} - {quote.sourceDocumentName || quote.sourceTitle || "Documento privado"}</p></div><Badge variant="secondary">Historica</Badge></div><div className="grid grid-cols-2 gap-2 border-y border-border/70 py-3 text-sm"><p><span className="text-muted-foreground">Itens:</span> {quote.items.length}</p><p><span className="text-muted-foreground">Vinculados:</span> {linkedItems}</p><p><span className="text-muted-foreground">Total:</span> {formatCurrency(quote.total)}</p><p><span className="text-muted-foreground">Emitida:</span> {quote.issuedOn || "A confirmar"}</p><p><span className="text-muted-foreground">Validade:</span> {quote.validUntil || "A confirmar"}</p></div><p className="text-xs text-muted-foreground">Valores permanecem historicos ate uma selecao manual de preco no catalogo.</p></CardContent></Card>; })}</div> : <Card className="border-dashed border-primary/20"><CardContent className="flex min-h-36 flex-col items-center justify-center p-5 text-center"><History className="mb-2 size-6 text-accent" /><p className="font-medium">Nenhuma cotacao historica</p><p className="mt-1 text-sm text-muted-foreground">As cotacoes revisadas aparecerao aqui, preservando o arquivo privado que as fundamenta.</p></CardContent></Card>}</section>;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

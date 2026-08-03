@@ -85,6 +85,20 @@ export const steelFrameSupplierQuoteAnalysisSchema = z.object({
 
 export type SteelFrameSupplierQuoteAnalysis = z.infer<typeof steelFrameSupplierQuoteAnalysisSchema>;
 
+export type SteelFrameSupplierQuoteMaterialCandidate = {
+  id: string;
+  sku: string | null;
+  name: string;
+  category: string;
+  unit: string;
+};
+
+export type SteelFrameSupplierQuoteMaterialSuggestion = {
+  materialId: string;
+  confidence: "high" | "medium";
+  reason: string;
+};
+
 export const steelFrameSupplierQuoteItemDraftSchema = z.object({
   sourceLineNumber: z.number().int().positive(),
   externalCode: z.string().trim().max(120).nullable(),
@@ -97,6 +111,28 @@ export const steelFrameSupplierQuoteItemDraftSchema = z.object({
   materialId: nullableIdentifier,
   materialVariantId: nullableIdentifier,
   matchingStatus: z.enum(["unmatched", "suggested", "confirmed", "not_applicable"]),
+}).superRefine((value, context) => {
+  if ((value.matchingStatus === "suggested" || value.matchingStatus === "confirmed") && !value.materialId) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["materialId"],
+      message: "O vinculo sugerido ou confirmado exige um material do catalogo.",
+    });
+  }
+  if ((value.matchingStatus === "unmatched" || value.matchingStatus === "not_applicable") && (value.materialId || value.materialVariantId)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["matchingStatus"],
+      message: "Um item sem vinculo nao pode apontar para um material do catalogo.",
+    });
+  }
+  if (value.materialVariantId && !value.materialId) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["materialVariantId"],
+      message: "A variante exige um material do catalogo.",
+    });
+  }
 });
 
 export type SteelFrameSupplierQuoteItemDraft = z.infer<typeof steelFrameSupplierQuoteItemDraftSchema>;
@@ -149,6 +185,68 @@ export function calculateSupplierQuoteItemsTotal(items: Array<Pick<SteelFrameSup
   return items.reduce((total, item) => total + item.lineTotal, 0);
 }
 
+function normalizeMatchText(value: string | null | undefined) {
+  return (value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function significantMatchTokens(value: string) {
+  const ignored = new Set(["com", "das", "dos", "para", "por", "steel", "frame"]);
+  return normalizeMatchText(value)
+    .split(" ")
+    .filter((token) => token.length >= 3 && !ignored.has(token));
+}
+
+export function suggestSupplierQuoteMaterial(
+  item: Pick<SteelFrameSupplierQuoteItemDraft, "externalCode" | "description">,
+  materials: SteelFrameSupplierQuoteMaterialCandidate[],
+): SteelFrameSupplierQuoteMaterialSuggestion | null {
+  const externalCode = normalizeMatchText(item.externalCode).replace(/\s/g, "");
+  if (externalCode) {
+    const skuMatches = materials.filter((material) => normalizeMatchText(material.sku).replace(/\s/g, "") === externalCode);
+    if (skuMatches.length === 1) {
+      return {
+        materialId: skuMatches[0].id,
+        confidence: "high",
+        reason: `Codigo externo igual ao SKU ${skuMatches[0].sku}.`,
+      };
+    }
+  }
+
+  const description = normalizeMatchText(item.description);
+  if (!description) return null;
+
+  const exactNameMatches = materials.filter((material) => normalizeMatchText(material.name) === description);
+  if (exactNameMatches.length === 1) {
+    return {
+      materialId: exactNameMatches[0].id,
+      confidence: "high",
+      reason: "Descricao igual ao nome do material.",
+    };
+  }
+
+  const descriptionTokens = new Set(significantMatchTokens(description));
+  const containedNameMatches = materials.filter((material) => {
+    const name = normalizeMatchText(material.name);
+    const nameTokens = significantMatchTokens(name);
+    return name.length >= 8 && nameTokens.length >= 2 && nameTokens.every((token) => descriptionTokens.has(token));
+  });
+
+  if (containedNameMatches.length === 1) {
+    return {
+      materialId: containedNameMatches[0].id,
+      confidence: "medium",
+      reason: "Os termos principais da descricao correspondem a um unico material.",
+    };
+  }
+
+  return null;
+}
+
 export function buildSteelFrameSupplierQuoteAnalysisPrompt({
   documentName,
   additionalContext,
@@ -169,6 +267,7 @@ Contexto adicional: ${additionalContext.trim() || "Nao informado."}
 
 Use datas em YYYY-MM-DD. Use numeros JSON sem simbolo de moeda e sempre em BRL quando o documento usar reais.
 Para cada item, preserve a descricao fornecida, o codigo externo quando houver, quantidade, unidade, preco unitario e total da linha. source_line_number deve seguir a ordem visual da tabela, iniciando em 1.
+Quando a unidade estiver quebrada na linha visual seguinte, associe-a ao item anterior da mesma linha comercial. Nao transforme METRO, PACOTE, PC ou outra unidade em um novo item.
 
 Retorne exclusivamente JSON valido, sem markdown ou texto externo, neste formato:
 {
