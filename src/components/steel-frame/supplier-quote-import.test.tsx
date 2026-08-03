@@ -14,6 +14,7 @@ const repositoryMocks = vi.hoisted(() => ({
 
 const dataMocks = vi.hoisted(() => ({
   listSteelFrameMaterials: vi.fn(),
+  registerSteelFrameMaterialPrice: vi.fn(),
 }));
 
 vi.mock("@/components/app-navigation", () => ({
@@ -35,6 +36,7 @@ vi.mock("@/lib/steel-frame/catalog", async (importOriginal) => {
 vi.mock("@/lib/steel-frame/data", () => ({
   getSteelFrameErrorMessage: (error: unknown) => error instanceof Error ? error.message : "Erro no catalogo.",
   listSteelFrameMaterials: dataMocks.listSteelFrameMaterials,
+  registerSteelFrameMaterialPrice: dataMocks.registerSteelFrameMaterialPrice,
 }));
 
 const sourceId = "11111111-1111-4111-8111-111111111111";
@@ -97,6 +99,49 @@ const material = {
   prices: [],
 };
 
+const historicalQuote = {
+  id: "66666666-6666-4666-8666-666666666666",
+  status: "captured",
+  createdBy: "44444444-4444-4444-8444-444444444444",
+  createdAt: "2026-08-02T22:00:00Z",
+  updatedAt: "2026-08-02T22:00:00Z",
+  sourceTitle: "Cotacao 21516",
+  sourceDocumentName: "cotacao-21516.pdf",
+  sourceId,
+  sourceDocumentId: documentId,
+  supplierId: null,
+  supplierName: "Atacadao Drywall",
+  supplierTaxId: null,
+  supplierContactName: null,
+  supplierContactPhone: null,
+  supplierContactEmail: null,
+  quoteNumber: "21516",
+  issuedOn: "2026-08-02",
+  validUntil: null,
+  expectedBillingOn: null,
+  paymentTerms: "A Vista",
+  subtotal: 7140,
+  discount: 0,
+  freight: 0,
+  taxes: 0,
+  total: 7140,
+  currency: "BRL",
+  notes: null,
+  items: [{
+    sourceLineNumber: 1,
+    externalCode: "1823",
+    description: "GUIA STELL FRAME 90 X 0,95 X 6000MM",
+    ncm: "7216.91.00",
+    quantity: 60,
+    unit: "PC",
+    unitPrice: 119,
+    lineTotal: 7140,
+    materialId,
+    materialVariantId: null,
+    matchingStatus: "confirmed",
+  }],
+};
+
 describe("SupplierQuoteImport", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -104,6 +149,7 @@ describe("SupplierQuoteImport", () => {
     repositoryMocks.listSupplierQuotes.mockResolvedValue([]);
     repositoryMocks.createSupplierQuote.mockResolvedValue({ id: "55555555-5555-4555-8555-555555555555" });
     dataMocks.listSteelFrameMaterials.mockResolvedValue([material]);
+    dataMocks.registerSteelFrameMaterialPrice.mockResolvedValue({ id: "77777777-7777-4777-8777-777777777777" });
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
       analysis: {
         supplier: { name: "Atacadao Drywall", tax_id: "03.321.303/0001-02", contact_name: null, contact_phone: null, contact_email: null },
@@ -169,5 +215,27 @@ describe("SupplierQuoteImport", () => {
         matchingStatus: "confirmed",
       })],
     })));
+  });
+
+  it("registers a reviewed quote item as a new audited material price only after confirmation", async () => {
+    const user = userEvent.setup();
+    repositoryMocks.listSupplierQuotes.mockResolvedValue([historicalQuote]);
+    render(<SupplierQuoteImport />);
+
+    await user.click(await screen.findByText("Revisar 1 item(ns) vinculado(s)"));
+    await user.click(screen.getByRole("button", { name: "Registrar preco" }));
+
+    expect(await screen.findByRole("heading", { name: "Novo preco a partir da cotacao" })).toBeInTheDocument();
+    expect(screen.getByText(/A unidade da cotacao \(PC\) difere da unidade do catalogo \(barra\)/)).toBeInTheDocument();
+    expect(dataMocks.registerSteelFrameMaterialPrice).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Confirmar e registrar preco" }));
+    await waitFor(() => expect(dataMocks.registerSteelFrameMaterialPrice).toHaveBeenCalledWith({
+      materialId,
+      unitCost: 119,
+      effectiveFrom: "2026-08-02",
+      sourceReference: "Cotacao 21516 - Atacadao Drywall - linha 1",
+    }));
+    expect(repositoryMocks.listSupplierQuotes).toHaveBeenCalledTimes(2);
   });
 });

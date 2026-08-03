@@ -181,6 +181,37 @@ export type SteelFrameSupplierQuoteRecord = SteelFrameSupplierQuoteDraft & {
   sourceDocumentName: string | null;
 };
 
+export const steelFrameSupplierQuotePriceCandidateSchema = z.object({
+  matchingStatus: z.literal("confirmed"),
+  materialId: z.string().uuid(),
+  unitPrice: z.number().finite().positive(),
+  unit: z.string().trim().min(1),
+});
+
+export function isSupplierQuoteItemPriceCandidate(
+  item: Pick<SteelFrameSupplierQuoteItemDraft, "matchingStatus" | "materialId" | "unitPrice" | "unit">,
+) {
+  return steelFrameSupplierQuotePriceCandidateSchema.safeParse(item).success;
+}
+
+export function buildSupplierQuotePriceSourceReference({
+  quoteId,
+  quoteNumber,
+  supplierName,
+  sourceDocumentName,
+  sourceLineNumber,
+}: {
+  quoteId: string;
+  quoteNumber: string | null;
+  supplierName: string;
+  sourceDocumentName: string | null;
+  sourceLineNumber: number | null;
+}) {
+  const reference = quoteNumber?.trim() || sourceDocumentName?.trim() || quoteId;
+  const line = sourceLineNumber === null ? "linha a confirmar" : `linha ${sourceLineNumber}`;
+  return `Cotacao ${reference} - ${supplierName.trim()} - ${line}`.slice(0, 500);
+}
+
 export function calculateSupplierQuoteItemsTotal(items: Array<Pick<SteelFrameSupplierQuoteItemDraft, "lineTotal">>) {
   return items.reduce((total, item) => total + item.lineTotal, 0);
 }

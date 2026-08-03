@@ -3,6 +3,7 @@
 import Link from "next/link";
 import * as React from "react";
 import {
+  BadgeDollarSign,
   BookOpenText,
   ClipboardCheck,
   FileSearch,
@@ -20,12 +21,15 @@ import { useNavigationAccess } from "@/components/app-navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
   createSupabaseSteelFrameCatalogRepository,
+  buildSupplierQuotePriceSourceReference,
+  isSupplierQuoteItemPriceCandidate,
   steelFrameSupplierQuoteAnalysisSchema,
   steelFrameSupplierQuoteDraftSchema,
   suggestSupplierQuoteMaterial,
@@ -34,7 +38,8 @@ import {
   type SteelFrameSupplierQuoteMaterialSuggestion,
   type SteelFrameSupplierQuoteRecord,
 } from "@/lib/steel-frame/catalog";
-import { getSteelFrameErrorMessage, listSteelFrameMaterials } from "@/lib/steel-frame/data";
+import { getCurrentMaterialPrice } from "@/lib/steel-frame/costing";
+import { getSteelFrameErrorMessage, listSteelFrameMaterials, registerSteelFrameMaterialPrice } from "@/lib/steel-frame/data";
 import type { SteelFrameMaterialRecord } from "@/lib/steel-frame/types";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
@@ -74,6 +79,18 @@ type QuoteForm = {
   notes: string;
 };
 
+type QuotePriceTarget = {
+  quote: SteelFrameSupplierQuoteRecord;
+  item: SteelFrameSupplierQuoteRecord["items"][number];
+  material: SteelFrameMaterialRecord;
+};
+
+type QuotePriceForm = {
+  unitCost: string;
+  effectiveFrom: string;
+  sourceReference: string;
+};
+
 const emptyForm: QuoteForm = {
   supplierName: "",
   supplierTaxId: "",
@@ -92,6 +109,10 @@ const emptyForm: QuoteForm = {
   total: "",
   notes: "",
 };
+
+function todayDate() {
+  return new Date().toISOString().slice(0, 10);
+}
 
 function textOrEmpty(value: string | null) {
   return value ?? "";
@@ -180,8 +201,16 @@ export function SupplierQuoteImport() {
   const [loading, setLoading] = React.useState(true);
   const [analyzing, setAnalyzing] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
+  const [savingPrice, setSavingPrice] = React.useState(false);
+  const [priceTarget, setPriceTarget] = React.useState<QuotePriceTarget | null>(null);
+  const [priceForm, setPriceForm] = React.useState<QuotePriceForm>({
+    unitCost: "",
+    effectiveFrom: todayDate(),
+    sourceReference: "",
+  });
   const [error, setError] = React.useState<string | null>(null);
   const canManage = role === "admin" || permissions.includes("*") || permissions.includes("estimates.catalog.manage");
+  const canManagePrices = role === "admin" || permissions.includes("*") || permissions.includes("estimates.prices.manage");
 
   const sourceCandidates = React.useMemo(
     () => sources.filter((source) => source.sourceType === "supplier_quote"),
@@ -361,6 +390,54 @@ export function SupplierQuoteImport() {
     }
   }
 
+  function openQuotePrice(
+    quote: SteelFrameSupplierQuoteRecord,
+    item: SteelFrameSupplierQuoteRecord["items"][number],
+  ) {
+    if (!isSupplierQuoteItemPriceCandidate(item)) {
+      toast.error("Confirme o material e um preco unitario valido antes de registra-lo no catalogo.");
+      return;
+    }
+    const material = materials.find((candidate) => candidate.id === item.materialId) ?? null;
+    if (!material) {
+      toast.error("O material vinculado nao esta mais ativo no catalogo.");
+      return;
+    }
+    setPriceTarget({ quote, item, material });
+    setPriceForm({
+      unitCost: String(item.unitPrice),
+      effectiveFrom: quote.issuedOn ?? todayDate(),
+      sourceReference: buildSupplierQuotePriceSourceReference({
+        quoteId: quote.id,
+        quoteNumber: quote.quoteNumber,
+        supplierName: quote.supplierName,
+        sourceDocumentName: quote.sourceDocumentName,
+        sourceLineNumber: item.sourceLineNumber,
+      }),
+    });
+  }
+
+  async function saveQuotePrice(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!priceTarget) return;
+    setSavingPrice(true);
+    try {
+      await registerSteelFrameMaterialPrice({
+        materialId: priceTarget.material.id,
+        unitCost: Number(priceForm.unitCost),
+        effectiveFrom: priceForm.effectiveFrom,
+        sourceReference: priceForm.sourceReference,
+      });
+      toast.success("Preco registrado com a cotacao como fonte. O historico anterior foi preservado.");
+      setPriceTarget(null);
+      await load();
+    } catch (priceError) {
+      toast.error(getSteelFrameErrorMessage(priceError));
+    } finally {
+      setSavingPrice(false);
+    }
+  }
+
   if (loading || accessLoading) return <QuoteImportSkeleton />;
 
   if (error) {
@@ -417,7 +494,47 @@ export function SupplierQuoteImport() {
 
       {analysis ? <QuoteReview form={form} items={items} materials={materials} analysis={analysis} saving={saving} onFormChange={updateForm} onItemChange={updateItem} onConfirmSuggestion={confirmSuggestion} onAddItem={addItem} onRemoveItem={(id) => setItems((current) => current.filter((item) => item.id !== id))} onSave={() => void saveQuote()} /> : null}
 
-      <SupplierQuoteHistory quotes={quotes} />
+      <SupplierQuoteHistory
+        quotes={quotes}
+        materials={materials}
+        canManagePrices={canManagePrices}
+        onRegisterPrice={openQuotePrice}
+      />
+
+      <Dialog open={Boolean(priceTarget)} onOpenChange={(open) => { if (!open && !savingPrice) setPriceTarget(null); }}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Novo preco a partir da cotacao</DialogTitle>
+            <DialogDescription>Revise a unidade, a vigencia e a fonte. Nenhum preco e publicado sem esta confirmacao.</DialogDescription>
+          </DialogHeader>
+          {priceTarget ? (
+            <form className="space-y-4" onSubmit={saveQuotePrice}>
+              <div className="rounded-lg border border-primary/15 bg-secondary/25 p-3 text-sm">
+                <p className="font-medium text-foreground">{priceTarget.material.name}</p>
+                <div className="mt-2 grid gap-1 text-muted-foreground sm:grid-cols-2">
+                  <p>Cotacao: {formatCurrency(priceTarget.item.unitPrice ?? 0)} / {priceTarget.item.unit}</p>
+                  <p>Catalogo: unidade {priceTarget.material.unit}</p>
+                  <p>Preco vigente: {getCurrentMaterialPrice(priceTarget.material) ? formatCurrency(getCurrentMaterialPrice(priceTarget.material)?.unitCost ?? 0) : "Nao cadastrado"}</p>
+                  <p>Linha de origem: {priceTarget.item.sourceLineNumber ?? "A confirmar"}</p>
+                </div>
+              </div>
+              {priceTarget.item.unit.trim().toLowerCase() !== priceTarget.material.unit.trim().toLowerCase() ? (
+                <p className="rounded-lg border border-amber-500/30 bg-amber-500/[0.05] p-3 text-sm text-muted-foreground">A unidade da cotacao ({priceTarget.item.unit}) difere da unidade do catalogo ({priceTarget.material.unit}). Confirme que representam a mesma unidade comercial antes de registrar.</p>
+              ) : null}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Custo unitario"><Input aria-label="Custo unitario da cotacao" type="number" min="0.01" step="0.01" value={priceForm.unitCost} onChange={(event) => setPriceForm((current) => ({ ...current, unitCost: event.target.value }))} /></Field>
+                <Field label="Vigente a partir de"><Input aria-label="Vigencia do preco da cotacao" type="date" value={priceForm.effectiveFrom} onChange={(event) => setPriceForm((current) => ({ ...current, effectiveFrom: event.target.value }))} /></Field>
+              </div>
+              <Field label="Fonte auditavel"><Input aria-label="Fonte auditavel do preco" value={priceForm.sourceReference} onChange={(event) => setPriceForm((current) => ({ ...current, sourceReference: event.target.value }))} /></Field>
+              <p className="text-xs text-muted-foreground">O registro cria uma nova vigencia no historico de precos. A cotacao e seus itens permanecem inalterados.</p>
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button type="button" variant="outline" disabled={savingPrice} onClick={() => setPriceTarget(null)}>Cancelar</Button>
+                <Button type="submit" disabled={savingPrice}><BadgeDollarSign className="size-4" />{savingPrice ? "Registrando..." : "Confirmar e registrar preco"}</Button>
+              </div>
+            </form>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -468,8 +585,57 @@ function QuoteItemEditor({ item, materials, index, canRemove, onChange, onConfir
   return <div className="space-y-3 rounded-xl border bg-card p-3"><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[0.42fr_0.72fr_2fr_0.7fr_0.7fr_0.7fr_0.85fr_auto]"><Field label={`Linha ${index + 1}`}><Input inputMode="numeric" value={item.sourceLineNumber} onChange={(event) => onChange(item.id, "sourceLineNumber", event.target.value)} /></Field><Field label="Codigo"><Input value={item.externalCode} onChange={(event) => onChange(item.id, "externalCode", event.target.value)} /></Field><Field label="Descricao"><Input value={item.description} onChange={(event) => onChange(item.id, "description", event.target.value)} /></Field><Field label="Qtd."><Input inputMode="decimal" value={item.quantity} onChange={(event) => onChange(item.id, "quantity", event.target.value)} /></Field><Field label="Unidade"><Input value={item.unit} onChange={(event) => onChange(item.id, "unit", event.target.value)} /></Field><Field label="Unitario"><Input inputMode="decimal" value={item.unitPrice} onChange={(event) => onChange(item.id, "unitPrice", event.target.value)} /></Field><Field label="Total"><Input inputMode="decimal" value={item.lineTotal} onChange={(event) => onChange(item.id, "lineTotal", event.target.value)} /></Field><div className="flex items-end">{canRemove ? <Button type="button" size="icon" variant="ghost" aria-label={`Remover item ${index + 1}`} onClick={() => onRemove(item.id)}><Trash2 className="size-4 text-destructive" /></Button> : null}</div></div><div className="grid gap-3 border-t border-border/70 pt-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] lg:items-end"><Field label="Material do catalogo"><Select value={matchValue} onValueChange={(value) => onChange(item.id, "materialId", value)}><SelectTrigger aria-label={`Material do catalogo do item ${index + 1}`}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="unmatched">Ainda nao vinculado</SelectItem><SelectItem value="not_applicable">Nao se aplica ao catalogo</SelectItem>{materials.map((material) => <SelectItem key={material.id} value={material.id}>{material.name}{material.sku ? ` - ${material.sku}` : ""}</SelectItem>)}</SelectContent></Select></Field><div className="min-w-0">{item.matchingStatus === "confirmed" ? <div className="flex min-h-10 items-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/[0.06] px-3 text-sm"><Badge variant="secondary">Confirmado</Badge><span className="truncate text-muted-foreground">Vinculo revisado pelo administrador.</span></div> : item.matchingStatus === "unmatched" && suggestedMaterial && item.suggestion ? <div className="flex flex-col gap-2 rounded-lg border border-amber-500/25 bg-amber-500/[0.05] p-3 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><Badge variant="outline">Sugestao {item.suggestion.confidence === "high" ? "alta" : "media"}</Badge><span className="truncate text-sm font-medium">{suggestedMaterial.name}</span></div><p className="mt-1 text-xs text-muted-foreground">{item.suggestion.reason}</p></div><Button type="button" size="sm" variant="outline" onClick={() => onConfirmSuggestion(item.id)}>Confirmar sugestao</Button></div> : <div className="flex min-h-10 items-center rounded-lg border border-dashed px-3 text-xs text-muted-foreground">{item.matchingStatus === "not_applicable" ? "Item marcado como nao aplicavel ao catalogo." : "Nenhuma correspondencia segura. Revise manualmente."}</div>}</div></div></div>;
 }
 
-function SupplierQuoteHistory({ quotes }: { quotes: SteelFrameSupplierQuoteRecord[] }) {
-  return <section className="space-y-3"><div className="flex items-center gap-2"><History className="size-4 text-primary" /><h2 className="text-base font-semibold">Historico de cotacoes</h2></div>{quotes.length ? <div className="grid gap-3 xl:grid-cols-2">{quotes.map((quote) => { const linkedItems = quote.items.filter((item) => item.matchingStatus === "confirmed").length; return <Card key={quote.id} className="border-primary/10"><CardContent className="space-y-3 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold">{quote.supplierName}</p><p className="mt-1 text-sm text-muted-foreground">{quote.quoteNumber ? `Cotacao ${quote.quoteNumber}` : "Numero a confirmar"} - {quote.sourceDocumentName || quote.sourceTitle || "Documento privado"}</p></div><Badge variant="secondary">Historica</Badge></div><div className="grid grid-cols-2 gap-2 border-y border-border/70 py-3 text-sm"><p><span className="text-muted-foreground">Itens:</span> {quote.items.length}</p><p><span className="text-muted-foreground">Vinculados:</span> {linkedItems}</p><p><span className="text-muted-foreground">Total:</span> {formatCurrency(quote.total)}</p><p><span className="text-muted-foreground">Emitida:</span> {quote.issuedOn || "A confirmar"}</p><p><span className="text-muted-foreground">Validade:</span> {quote.validUntil || "A confirmar"}</p></div><p className="text-xs text-muted-foreground">Valores permanecem historicos ate uma selecao manual de preco no catalogo.</p></CardContent></Card>; })}</div> : <Card className="border-dashed border-primary/20"><CardContent className="flex min-h-36 flex-col items-center justify-center p-5 text-center"><History className="mb-2 size-6 text-accent" /><p className="font-medium">Nenhuma cotacao historica</p><p className="mt-1 text-sm text-muted-foreground">As cotacoes revisadas aparecerao aqui, preservando o arquivo privado que as fundamenta.</p></CardContent></Card>}</section>;
+function SupplierQuoteHistory({
+  quotes,
+  materials,
+  canManagePrices,
+  onRegisterPrice,
+}: {
+  quotes: SteelFrameSupplierQuoteRecord[];
+  materials: SteelFrameMaterialRecord[];
+  canManagePrices: boolean;
+  onRegisterPrice: (quote: SteelFrameSupplierQuoteRecord, item: SteelFrameSupplierQuoteRecord["items"][number]) => void;
+}) {
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center gap-2"><History className="size-4 text-primary" /><h2 className="text-base font-semibold">Historico de cotacoes</h2></div>
+      {quotes.length ? (
+        <div className="grid gap-3 xl:grid-cols-2">
+          {quotes.map((quote) => {
+            const linkedItems = quote.items.filter((item) => item.matchingStatus === "confirmed");
+            return (
+              <Card key={quote.id} className="border-primary/10">
+                <CardContent className="space-y-3 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold">{quote.supplierName}</p><p className="mt-1 text-sm text-muted-foreground">{quote.quoteNumber ? `Cotacao ${quote.quoteNumber}` : "Numero a confirmar"} - {quote.sourceDocumentName || quote.sourceTitle || "Documento privado"}</p></div><Badge variant="secondary">Historica</Badge></div>
+                  <div className="grid grid-cols-2 gap-2 border-y border-border/70 py-3 text-sm"><p><span className="text-muted-foreground">Itens:</span> {quote.items.length}</p><p><span className="text-muted-foreground">Vinculados:</span> {linkedItems.length}</p><p><span className="text-muted-foreground">Total:</span> {formatCurrency(quote.total)}</p><p><span className="text-muted-foreground">Emitida:</span> {quote.issuedOn || "A confirmar"}</p><p><span className="text-muted-foreground">Validade:</span> {quote.validUntil || "A confirmar"}</p></div>
+                  {linkedItems.length ? (
+                    <details className="group rounded-lg border border-border/70 bg-muted/20 p-3">
+                      <summary className="cursor-pointer text-sm font-medium text-foreground">Revisar {linkedItems.length} item(ns) vinculado(s)</summary>
+                      <div className="mt-3 space-y-2 border-t border-border/60 pt-3">
+                        {linkedItems.map((item, index) => {
+                          const material = materials.find((candidate) => candidate.id === item.materialId) ?? null;
+                          const canRegister = material && isSupplierQuoteItemPriceCandidate(item);
+                          return (
+                            <div key={`${quote.id}-${item.sourceLineNumber ?? index}`} className="flex flex-col gap-3 rounded-lg border bg-card p-3 sm:flex-row sm:items-center sm:justify-between">
+                              <div className="min-w-0"><p className="truncate text-sm font-medium">{material?.name ?? "Material indisponivel no catalogo"}</p><p className="mt-1 text-xs text-muted-foreground">{item.description} - {item.unitPrice === null ? "Preco a confirmar" : `${formatCurrency(item.unitPrice)} / ${item.unit}`}</p></div>
+                              {canManagePrices && canRegister ? <Button type="button" size="sm" variant="outline" onClick={() => onRegisterPrice(quote, item)}><BadgeDollarSign className="size-4" /> Registrar preco</Button> : null}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </details>
+                  ) : null}
+                  <p className="text-xs text-muted-foreground">Valores permanecem historicos. Somente itens vinculados podem criar um novo preco apos confirmacao explicita.</p>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      ) : (
+        <Card className="border-dashed border-primary/20"><CardContent className="flex min-h-36 flex-col items-center justify-center p-5 text-center"><History className="mb-2 size-6 text-accent" /><p className="font-medium">Nenhuma cotacao historica</p><p className="mt-1 text-sm text-muted-foreground">As cotacoes revisadas aparecerao aqui, preservando o arquivo privado que as fundamenta.</p></CardContent></Card>
+      )}
+    </section>
+  );
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

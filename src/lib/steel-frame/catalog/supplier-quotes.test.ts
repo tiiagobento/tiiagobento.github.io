@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildSupplierQuotePriceSourceReference,
   buildSteelFrameSupplierQuoteAnalysisPrompt,
   calculateSupplierQuoteItemsTotal,
+  isSupplierQuoteItemPriceCandidate,
   suggestSupplierQuoteMaterial,
   steelFrameSupplierQuoteAnalysisSchema,
   steelFrameSupplierQuoteDraftSchema,
@@ -210,5 +212,36 @@ describe("supplier quote catalog contracts", () => {
 
     expect(result.success).toBe(false);
     if (!result.success) expect(result.error.issues[0]?.message).toContain("exige um material");
+  });
+
+  it("only allows reviewed quote items with a valid unit price to become price candidates", () => {
+    expect(isSupplierQuoteItemPriceCandidate({
+      matchingStatus: "confirmed",
+      materialId: sourceId,
+      unitPrice: 119,
+      unit: "PC",
+    })).toBe(true);
+    expect(isSupplierQuoteItemPriceCandidate({
+      matchingStatus: "unmatched",
+      materialId: null,
+      unitPrice: 119,
+      unit: "PC",
+    })).toBe(false);
+    expect(isSupplierQuoteItemPriceCandidate({
+      matchingStatus: "confirmed",
+      materialId: sourceId,
+      unitPrice: 0,
+      unit: "PC",
+    })).toBe(false);
+  });
+
+  it("creates a traceable source reference without changing the historic quote", () => {
+    expect(buildSupplierQuotePriceSourceReference({
+      quoteId: sourceId,
+      quoteNumber: "21516",
+      supplierName: "Atacadao Drywall",
+      sourceDocumentName: "cotacao-21516.pdf",
+      sourceLineNumber: 1,
+    })).toBe("Cotacao 21516 - Atacadao Drywall - linha 1");
   });
 });

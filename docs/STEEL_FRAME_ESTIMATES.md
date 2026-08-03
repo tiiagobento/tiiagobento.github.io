@@ -6,6 +6,7 @@ O modulo tem uma fundacao segura e auditavel e uma interface operacional que com
 
 - lista de orcamentos, criacao a partir de um lead ou manual e ficha de geometria;
 - catalogo de materiais com preco inicial cadastrado por permissao;
+- cotacoes privadas de fornecedor com extracao por IA, revisao de cada vinculo ao material e promocao manual do preco para um novo periodo auditavel, sem alterar o documento historico;
 - itens calculados pelo motor tipado com regra aprovada, explicacao e plano de corte, mantendo o calculo manual como contingencia;
 - edicao e arquivamento auditavel de materiais, mao de obra e custos operacionais, sem exclusao do historico;
 - custo direto, preco minimo, preco recomendado e desconto maximo derivados somente dos dados salvos;
@@ -123,6 +124,9 @@ um novo preco com fonte e vigencia, consultar o historico e arquivar um material
 com motivo. A migration
 `20260804000000_steel_frame_material_catalog_lifecycle.sql` preserva todos os
 precos anteriores, audita materiais e precos e nao publica regras tecnicas.
+Itens de cotacoes historicas so podem originar um preco quando o vinculo ao
+material foi confirmado, o valor unitario e valido e um administrador confirma
+a nova vigencia. A cotacao original permanece imutavel.
 
 1. Edicao/arquivamento de fornecedores, composicoes e reforcos.
 2. Criacao guiada de uma nova versao quando uma proposta congelada precisar de revisao.
